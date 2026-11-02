@@ -98,7 +98,7 @@ export function ProfileView({
   };
 
   // 3. User's active listings
-  const myListings = listings.filter((l) => l.provider_id === profile.id);
+  const myListings = listings.filter((l) => l.provider_id === profile.id && l.is_active !== false);
 
   return (
     <div className="flex flex-col gap-4 p-4 pb-12">

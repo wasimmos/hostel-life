@@ -243,6 +243,26 @@ export async function confirmGigCompletionRPC(gigId: string) {
   return data; // returns 'PENDING_OTHER_PARTY' or 'COMPLETED'
 }
 
+export async function deactivateServiceSource(sourceType: "LISTING" | "REQUEST", sourceId: string) {
+  if (!isSupabaseConfigured() || !sourceId) return;
+
+  try {
+    if (sourceType === "LISTING") {
+      await supabase
+        .from("service_listings")
+        .update({ is_active: false })
+        .eq("id", sourceId);
+    } else if (sourceType === "REQUEST") {
+      await supabase
+        .from("service_requests")
+        .update({ is_open: false })
+        .eq("id", sourceId);
+    }
+  } catch (err) {
+    console.warn("deactivateServiceSource notice:", err);
+  }
+}
+
 // ==========================================
 // 4. CROSS-DEVICE SERVICE MODERATION & APPROVAL SYNC
 // ==========================================

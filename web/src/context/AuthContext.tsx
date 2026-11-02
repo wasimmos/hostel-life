@@ -101,69 +101,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const supabase = createClient();
 
-  // Initialize session / check local login status on mount
+  // Initialize session on mount: only restore active tab session from sessionStorage
+  // In a new app window / fresh tab, sessionStorage is empty so user starts on LoginScreen
   useEffect(() => {
     try {
-      const savedLogin = localStorage.getItem("hostelhire_logged_in");
-      const savedUserId = localStorage.getItem("hostelhire_user_id");
-      const savedUserProfile = localStorage.getItem("hostelhire_user_profile");
+      // Clean up any legacy persistent auto-login flags
+      localStorage.removeItem("hostelhire_logged_in");
 
-      if (savedLogin === "true") {
-        setIsAuthenticated(true);
-        if (savedUserProfile) {
-          try {
-            const parsed = JSON.parse(savedUserProfile);
-            if (parsed && parsed.id) {
-              setCurrentUser(parsed);
-            }
-          } catch {}
-        } else if (savedUserId) {
-          const match = DEMO_PROFILES.find((p) => p.id === savedUserId);
-          if (match) setCurrentUser(match);
+      const sessionAuth = sessionStorage.getItem("hostelhire_session_auth");
+      const sessionUser = sessionStorage.getItem("hostelhire_session_user");
+
+      if (sessionAuth === "true" && sessionUser) {
+        const parsed = JSON.parse(sessionUser);
+        if (parsed && parsed.id) {
+          setCurrentUser(parsed);
+          setIsAuthenticated(true);
+          return;
         }
       }
+      setIsAuthenticated(false);
     } catch {
-      // Safe fallback if SSR / storage disabled
+      setIsAuthenticated(false);
     }
-
-    if (!isSupabaseConfigured()) return;
-
-    const checkSession = async () => {
-      try {
-        const savedUserId = localStorage.getItem("hostelhire_user_id");
-        if (savedUserId) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", savedUserId)
-            .maybeSingle();
-
-          if (profile) {
-            setCurrentUser(profile);
-            setIsAuthenticated(true);
-            localStorage.setItem("hostelhire_logged_in", "true");
-            localStorage.setItem("hostelhire_user_id", profile.id);
-            localStorage.setItem("hostelhire_user_profile", JSON.stringify(profile));
-          }
-        }
-      } catch (e) {
-        console.error("Auth session check notice:", e);
-      }
-    };
-
-    checkSession();
   }, []);
 
   const setDirectLogin = (logged: boolean) => {
     setIsAuthenticated(logged);
-    if (logged) {
-      localStorage.setItem("hostelhire_logged_in", "true");
-      localStorage.setItem("hostelhire_user_id", currentUser.id);
-      localStorage.setItem("hostelhire_user_profile", JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem("hostelhire_logged_in");
-      localStorage.removeItem("hostelhire_user_profile");
-    }
+    try {
+      if (logged) {
+        sessionStorage.setItem("hostelhire_session_auth", "true");
+        sessionStorage.setItem("hostelhire_session_user", JSON.stringify(currentUser));
+      } else {
+        sessionStorage.removeItem("hostelhire_session_auth");
+        sessionStorage.removeItem("hostelhire_session_user");
+      }
+    } catch {}
   };
 
   const switchUser = (userId: string) => {
@@ -171,8 +143,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (found) {
       setCurrentUser(found);
       setIsRealAuth(false);
-      localStorage.setItem("hostelhire_user_id", found.id);
-      localStorage.setItem("hostelhire_user_profile", JSON.stringify(found));
+      try {
+        sessionStorage.setItem("hostelhire_session_user", JSON.stringify(found));
+      } catch {}
     }
   };
 
@@ -184,12 +157,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (password !== "admin@jec123") {
         return { error: "Invalid password for Wasim Ahmed. Use: admin@jec123" };
       }
-      setCurrentUser(DEMO_PROFILES[0]);
+      const adminUser = DEMO_PROFILES[0];
+      setCurrentUser(adminUser);
       setIsAuthenticated(true);
       try {
-        localStorage.setItem("hostelhire_logged_in", "true");
-        localStorage.setItem("hostelhire_user_id", DEMO_PROFILES[0].id);
-        localStorage.setItem("hostelhire_user_profile", JSON.stringify(DEMO_PROFILES[0]));
+        sessionStorage.setItem("hostelhire_session_auth", "true");
+        sessionStorage.setItem("hostelhire_session_user", JSON.stringify(adminUser));
       } catch {}
       return {};
     }
@@ -198,12 +171,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (password !== "rhea@jec123") {
         return { error: "Invalid password for Rhea Goswami. Use: rhea@jec123" };
       }
-      setCurrentUser(DEMO_PROFILES[1]);
+      const studentUser = DEMO_PROFILES[1];
+      setCurrentUser(studentUser);
       setIsAuthenticated(true);
       try {
-        localStorage.setItem("hostelhire_logged_in", "true");
-        localStorage.setItem("hostelhire_user_id", DEMO_PROFILES[1].id);
-        localStorage.setItem("hostelhire_user_profile", JSON.stringify(DEMO_PROFILES[1]));
+        sessionStorage.setItem("hostelhire_session_auth", "true");
+        sessionStorage.setItem("hostelhire_session_user", JSON.stringify(studentUser));
       } catch {}
       return {};
     }
@@ -220,9 +193,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setCurrentUser(profile);
         setIsAuthenticated(true);
         try {
-          localStorage.setItem("hostelhire_logged_in", "true");
-          localStorage.setItem("hostelhire_user_id", profile.id);
-          localStorage.setItem("hostelhire_user_profile", JSON.stringify(profile));
+          sessionStorage.setItem("hostelhire_session_auth", "true");
+          sessionStorage.setItem("hostelhire_session_user", JSON.stringify(profile));
         } catch {}
         return {};
       }
@@ -296,9 +268,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setCurrentUser(newRegisteredUser);
     setIsAuthenticated(true);
     try {
-      localStorage.setItem("hostelhire_logged_in", "true");
-      localStorage.setItem("hostelhire_user_id", newRegisteredUser.id);
-      localStorage.setItem("hostelhire_user_profile", JSON.stringify(newRegisteredUser));
+      sessionStorage.setItem("hostelhire_session_auth", "true");
+      sessionStorage.setItem("hostelhire_session_user", JSON.stringify(newRegisteredUser));
     } catch {}
 
     return {};
@@ -306,12 +277,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     if (isSupabaseConfigured()) {
-      await supabase.auth.signOut();
+      try {
+        await supabase.auth.signOut();
+      } catch {}
     }
     setIsRealAuth(false);
     setIsAuthenticated(false);
     try {
+      sessionStorage.clear();
       localStorage.removeItem("hostelhire_logged_in");
+      localStorage.removeItem("hostelhire_user_id");
+      localStorage.removeItem("hostelhire_user_profile");
     } catch {}
     setCurrentUser(DEMO_PROFILES[0]);
   };

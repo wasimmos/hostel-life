@@ -8,6 +8,7 @@ import { getWhatsAppUrl, isFemaleHostel, canAccessDirectContact, maskPhoneNumber
 interface DiscoveryFeedProps {
   listings: (ServiceListing & { provider: any })[];
   requests: (ServiceRequest & { seeker: any })[];
+  completedSourceIds?: Set<string>;
   onSelectListing: (listing: ServiceListing) => void;
   onSelectRequest: (request: ServiceRequest) => void;
   onSelectProvider?: (provider: Profile) => void;
@@ -18,6 +19,7 @@ interface DiscoveryFeedProps {
 export function DiscoveryFeed({
   listings,
   requests,
+  completedSourceIds,
   onSelectListing,
   onSelectRequest,
   onSelectProvider,
@@ -36,8 +38,22 @@ export function DiscoveryFeed({
     "Hostel Essentials",
   ];
 
-  // Filter listings
-  const filteredListings = listings.filter((item) => {
+  // Active listings (exclude inactive or completed ones)
+  const activeListings = listings.filter((item) => {
+    if (item.is_active === false) return false;
+    if (completedSourceIds && completedSourceIds.has(item.id)) return false;
+    return true;
+  });
+
+  // Active requests (exclude closed or completed ones)
+  const activeRequests = requests.filter((item) => {
+    if (item.is_open === false) return false;
+    if (completedSourceIds && completedSourceIds.has(item.id)) return false;
+    return true;
+  });
+
+  // Filter listings by category and search query
+  const filteredListings = activeListings.filter((item) => {
     const matchesCategory =
       selectedCategory === "All" || item.skill_category === selectedCategory;
     const matchesSearch =
@@ -46,8 +62,8 @@ export function DiscoveryFeed({
     return matchesCategory && matchesSearch;
   });
 
-  // Filter requests
-  const filteredRequests = requests.filter((item) => {
+  // Filter requests by category and search query
+  const filteredRequests = activeRequests.filter((item) => {
     const matchesCategory =
       selectedCategory === "All" || item.skill_category === selectedCategory;
     const matchesSearch =
@@ -69,7 +85,7 @@ export function DiscoveryFeed({
                 : "text-[#444653] hover:text-[#0F172A]"
             }`}
           >
-            Services Offered ({listings.length})
+            Services Offered ({activeListings.length})
           </button>
           <button
             onClick={() => setMode("requests")}
@@ -79,7 +95,7 @@ export function DiscoveryFeed({
                 : "text-[#444653] hover:text-[#0F172A]"
             }`}
           >
-            Requests Needed ({requests.length})
+            Requests Needed ({activeRequests.length})
           </button>
         </div>
 

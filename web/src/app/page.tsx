@@ -23,6 +23,7 @@ import {
   createServiceRequest,
   acceptGigInterestRPC,
   confirmGigCompletionRPC,
+  deactivateServiceSource,
   recordServiceRequest,
   recordServiceDecision,
   fetchServiceModerations,
@@ -31,12 +32,72 @@ import { ServiceListing, ServiceRequest, Gig, Review, Profile } from "@/types/da
 
 export default function Home() {
   const { user, isAuthenticated } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabType>("explore");
-  const [selectedGig, setSelectedGig] = useState<Gig | null>(null);
-  const [selectedProvider, setSelectedProvider] = useState<Profile | null>(null);
+
+  // Tab & View States restored from sessionStorage on page reload
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedTab = sessionStorage.getItem("hostelhire_active_tab") as TabType;
+        if (savedTab && ["explore", "activity", "earnings", "profile"].includes(savedTab)) {
+          return savedTab;
+        }
+      } catch {}
+    }
+    return "explore";
+  });
+
+  const [selectedGig, setSelectedGig] = useState<Gig | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedGigJson = sessionStorage.getItem("hostelhire_selected_gig_obj");
+        if (savedGigJson) {
+          return JSON.parse(savedGigJson);
+        }
+      } catch {}
+    }
+    return null;
+  });
+
+  const [selectedProvider, setSelectedProvider] = useState<Profile | null>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedProviderJson = sessionStorage.getItem("hostelhire_selected_provider_obj");
+        if (savedProviderJson) {
+          return JSON.parse(savedProviderJson);
+        }
+      } catch {}
+    }
+    return null;
+  });
+
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [isAdminView, setIsAdminView] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+
+  // Synchronize selected gig and provider with sessionStorage for seamless page reload persistence
+  const updateSelectedGig = (gig: (Gig & { seeker?: any; provider?: any }) | null) => {
+    setSelectedGig(gig);
+    try {
+      if (gig) {
+        sessionStorage.setItem("hostelhire_selected_gig_id", gig.id);
+        sessionStorage.setItem("hostelhire_selected_gig_obj", JSON.stringify(gig));
+      } else {
+        sessionStorage.removeItem("hostelhire_selected_gig_id");
+        sessionStorage.removeItem("hostelhire_selected_gig_obj");
+      }
+    } catch {}
+  };
+
+  const updateSelectedProvider = (provider: Profile | null) => {
+    setSelectedProvider(provider);
+    try {
+      if (provider) {
+        sessionStorage.setItem("hostelhire_selected_provider_obj", JSON.stringify(provider));
+      } else {
+        sessionStorage.removeItem("hostelhire_selected_provider_obj");
+      }
+    } catch {}
+  };
 
   // Campus Notifications State
   const [notifications, setNotifications] = useState<NotificationItem[]>([
@@ -340,7 +401,7 @@ export default function Home() {
           if (!prev) return null;
           const dec = syncdDecisions.find((d) => d.gigId === prev.id);
           if (dec && prev.status !== dec.decision) {
-            return {
+            const updated = {
               ...prev,
               status: dec.decision as any,
               provider: {
@@ -348,6 +409,10 @@ export default function Home() {
                 phone_number: dec.unlockedPhone || prev.provider?.phone_number || "+91 9876543211",
               },
             };
+            try {
+              sessionStorage.setItem("hostelhire_selected_gig_obj", JSON.stringify(updated));
+            } catch {}
+            return updated;
           }
           return prev;
         });
@@ -471,15 +536,28 @@ export default function Home() {
     },
   ];
 
+  // Filter out any gigs whose source listing or request was completed
+  const completedSourceIds = React.useMemo(() => {
+    return new Set(
+      gigs
+        .filter((g) => g.status === "COMPLETED")
+        .map((g) => g.source_id)
+        .filter(Boolean)
+    );
+  }, [gigs]);
+
   // Actions
   const handleTabChange = (tab: TabType) => {
     if (tab === "post") {
       setIsPostModalOpen(true);
     } else {
-      setSelectedGig(null);
-      setSelectedProvider(null);
+      updateSelectedGig(null);
+      updateSelectedProvider(null);
       setIsAdminView(false);
       setActiveTab(tab);
+      try {
+        sessionStorage.setItem("hostelhire_active_tab", tab);
+      } catch {}
     }
   };
 
@@ -512,6 +590,9 @@ export default function Home() {
     }
 
     setActiveTab("explore");
+    try {
+      sessionStorage.setItem("hostelhire_active_tab", "explore");
+    } catch {}
   };
 
   const handleAddRequest = async (data: any) => {
@@ -543,6 +624,9 @@ export default function Home() {
     }
 
     setActiveTab("explore");
+    try {
+      sessionStorage.setItem("hostelhire_active_tab", "explore");
+    } catch {}
   };
 
   const handleConfirmGigCompletion = async (gigId: string) => {
@@ -552,13 +636,28 @@ export default function Home() {
       // Fallback local update
     }
 
+    const targetGig = gigs.find((g) => g.id === gigId) || (selectedGig?.id === gigId ? selectedGig : null);
+    const completedAt = new Date().toISOString();
+
     setGigs((prev) => {
-      const updated = prev.map((g) => (g.id === gigId ? { ...g, status: "COMPLETED" as const } : g));
+      const updated = prev.map((g) => (g.id === gigId ? { ...g, status: "COMPLETED" as const, completed_at: completedAt } : g));
       try { localStorage.setItem("hostelhire_saved_gigs", JSON.stringify(updated)); } catch {}
       return updated;
     });
+
     if (selectedGig && selectedGig.id === gigId) {
-      setSelectedGig({ ...selectedGig, status: "COMPLETED" });
+      updateSelectedGig({ ...selectedGig, status: "COMPLETED", completed_at: completedAt });
+    }
+
+    // Immediately remove completed listing or request from explore feed and database
+    if (targetGig && targetGig.source_id) {
+      if (targetGig.source_type === "LISTING") {
+        setListings((prev) => prev.filter((item) => item.id !== targetGig.source_id));
+        deactivateServiceSource("LISTING", targetGig.source_id);
+      } else if (targetGig.source_type === "REQUEST") {
+        setRequests((prev) => prev.filter((item) => item.id !== targetGig.source_id));
+        deactivateServiceSource("REQUEST", targetGig.source_id);
+      }
     }
   };
 
@@ -570,7 +669,7 @@ export default function Home() {
     });
 
     if (selectedGig && selectedGig.id === gigId) {
-      setSelectedGig((prev) => (prev ? { ...prev, status: "INTERESTED" } : null));
+      updateSelectedGig({ ...selectedGig, status: "INTERESTED" });
     }
 
     const gigObj = gigs.find((g) => g.id === gigId) || selectedGig;
@@ -619,7 +718,7 @@ export default function Home() {
       return updated;
     });
     if (selectedGig && selectedGig.id === gigId) {
-      setSelectedGig((prev) => (prev ? { ...prev, status: "ACCEPTED" } : null));
+      updateSelectedGig({ ...selectedGig, status: "ACCEPTED" });
     }
 
     // Write approval decision to Supabase so the boy's mobile receives it and unlocks contact info
@@ -657,7 +756,7 @@ export default function Home() {
       return updated;
     });
     if (selectedGig && selectedGig.id === gigId) {
-      setSelectedGig((prev) => (prev ? { ...prev, status: "CANCELLED" } : null));
+      updateSelectedGig({ ...selectedGig, status: "CANCELLED" });
     }
 
     const targetGig = gigs.find((g) => g.id === gigId) || selectedGig;
@@ -689,7 +788,7 @@ export default function Home() {
   const handleSelectListing = (listing: ServiceListing) => {
     const existing = gigs.find((g) => g.source_id === listing.id);
     if (existing) {
-      setSelectedGig(existing);
+      updateSelectedGig(existing);
     } else {
       const providerBlock = (listing as any).provider?.hostel_block;
       const isProviderFemale = isFemaleHostel(providerBlock);
@@ -710,7 +809,7 @@ export default function Home() {
         provider: (listing as any).provider,
       };
       setGigs([newGig, ...gigs]);
-      setSelectedGig(newGig);
+      updateSelectedGig(newGig);
     }
   };
 
@@ -729,7 +828,7 @@ export default function Home() {
       provider: user,
     };
     setGigs([newGig, ...gigs]);
-    setSelectedGig(newGig);
+    updateSelectedGig(newGig);
   };
 
   if (!isAuthenticated) {
@@ -745,15 +844,15 @@ export default function Home() {
         unreadCount={unreadCount}
         onNotificationClick={() => setIsNotificationsOpen(true)}
         onAdminClick={() => {
-          setSelectedGig(null);
-          setSelectedProvider(null);
+          updateSelectedGig(null);
+          updateSelectedProvider(null);
           setIsAdminView(!isAdminView);
         }}
         onProfileClick={() => {
-          setSelectedGig(null);
-          setSelectedProvider(null);
+          updateSelectedGig(null);
+          updateSelectedProvider(null);
           setIsAdminView(false);
-          setActiveTab("profile");
+          handleTabChange("profile");
         }}
       />
 
@@ -765,9 +864,9 @@ export default function Home() {
             provider={selectedProvider}
             currentUser={user}
             listings={listings}
-            onBack={() => setSelectedProvider(null)}
+            onBack={() => updateSelectedProvider(null)}
             onSelectListing={(listing) => {
-              setSelectedProvider(null);
+              updateSelectedProvider(null);
               handleSelectListing(listing);
             }}
           />
@@ -776,7 +875,7 @@ export default function Home() {
             gig={selectedGig}
             currentUserRole={selectedGig.seeker_id === user.id ? "seeker" : "provider"}
             currentUser={user}
-            onBack={() => setSelectedGig(null)}
+            onBack={() => updateSelectedGig(null)}
             onConfirmCompletion={handleConfirmGigCompletion}
             onConsentContact={() => {}}
             onRequestService={handleSendServiceRequest}
@@ -787,14 +886,15 @@ export default function Home() {
           <DiscoveryFeed
             listings={listings}
             requests={requests}
+            completedSourceIds={completedSourceIds}
             currentUser={user}
             onRefresh={loadData}
             onSelectListing={handleSelectListing}
             onSelectRequest={handleSelectRequest}
-            onSelectProvider={(p) => setSelectedProvider(p)}
+            onSelectProvider={(p) => updateSelectedProvider(p)}
           />
         ) : activeTab === "activity" ? (
-          <MyGigsList gigs={gigs} onSelectGig={(g) => setSelectedGig(g)} />
+          <MyGigsList gigs={gigs} onSelectGig={(g) => updateSelectedGig(g)} />
         ) : activeTab === "earnings" ? (
           <EarningsView currentUser={user} gigs={gigs} />
         ) : (
@@ -802,7 +902,7 @@ export default function Home() {
             profile={user}
             gigs={gigs}
             listings={listings}
-            onBack={() => setActiveTab("explore")}
+            onBack={() => handleTabChange("explore")}
             onPostServiceClick={() => setIsPostModalOpen(true)}
           />
         )}
@@ -831,7 +931,7 @@ export default function Home() {
           );
           if (item.type === "gig") {
             setIsNotificationsOpen(false);
-            if (gigs.length > 0) setSelectedGig(gigs[0]);
+            if (gigs.length > 0) updateSelectedGig(gigs[0]);
           }
         }}
       />
