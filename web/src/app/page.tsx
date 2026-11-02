@@ -6,6 +6,7 @@ import { BottomNav, TabType } from "@/components/BottomNav";
 import { DiscoveryFeed } from "@/components/DiscoveryFeed";
 import { GigLifecycleView } from "@/components/GigLifecycleView";
 import { PostModal } from "@/components/PostModal";
+import { AuthModal } from "@/components/AuthModal";
 import { ProfileView } from "@/components/ProfileView";
 import { MyGigsList } from "@/components/MyGigsList";
 import { EarningsView } from "@/components/EarningsView";
@@ -430,6 +431,8 @@ export default function Home() {
         onSubmitListing={handleAddListing}
         onSubmitRequest={handleAddRequest}
       />
+
+      <AuthModal />
 
       <BottomNav
         activeTab={isAdminView ? "explore" : activeTab}
