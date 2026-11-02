@@ -268,7 +268,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         is_admin: false,
       });
 
-      if (profileError) return { error: profileError.message };
+      if (profileError) {
+        console.warn("Profile insert warning:", profileError);
+      }
+
+      const newRegisteredUser: Profile = {
+        id: data.user.id,
+        full_name: payload.full_name,
+        roll_number: payload.roll_number,
+        college_email: payload.email,
+        department: payload.department,
+        semester: payload.semester,
+        hostel_block: payload.hostel_block,
+        room_number: payload.room_number,
+        phone_number: payload.phone_number,
+        bio: payload.bio || "Hostel resident.",
+        is_admin: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      setCurrentUser(newRegisteredUser);
+      setIsAuthenticated(true);
+      try {
+        localStorage.setItem("hostelhire_logged_in", "true");
+        localStorage.setItem("hostelhire_user_id", newRegisteredUser.id);
+      } catch {}
 
       return {};
     } catch (err: any) {
