@@ -1,15 +1,71 @@
 /**
- * Contact and WhatsApp utility functions for HostelHire
+ * Contact, WhatsApp, and Female Campus Privacy Shield utility functions for HostelHire
  */
+
+export function isFemaleHostel(hostelBlock?: string | null): boolean {
+  if (!hostelBlock) return false;
+  return hostelBlock.toLowerCase().includes("girls hostel") || hostelBlock.toLowerCase().startsWith("gh");
+}
 
 export function cleanPhoneNumber(phone?: string | null): string {
   if (!phone) return "919876543210";
   const cleaned = phone.replace(/[^0-9]/g, "");
-  // If standard 10-digit Indian number without country code, prepend 91
   if (cleaned.length === 10) {
     return `91${cleaned}`;
   }
   return cleaned.length > 0 ? cleaned : "919876543210";
+}
+
+export function maskPhoneNumber(phone?: string | null): string {
+  if (!phone) return "+91 98765 •••••";
+  const clean = cleanPhoneNumber(phone);
+  // Keep first 7 digits visible (e.g. +91 98765), mask last 5
+  if (clean.length >= 10) {
+    const prefix = clean.slice(0, 7);
+    return `+${prefix.slice(0, 2)} ${prefix.slice(2)} •••••`;
+  }
+  return "+91 ••••• •••••";
+}
+
+export function getSafeMeetingPoint(
+  targetHostel?: string | null,
+  targetRoom?: string | null,
+  viewerHostel?: string | null
+): { location: string; isMasked: boolean; reason?: string } {
+  const isTargetFemale = isFemaleHostel(targetHostel);
+  const isViewerFemale = isFemaleHostel(viewerHostel);
+
+  // If target is a female resident and viewer is male (Boys Hostel):
+  if (isTargetFemale && !isViewerFemale) {
+    return {
+      location: "Campus Common Hub (Central Library / Admin Canteen / GH Gate)",
+      isMasked: true,
+      reason: "Per JEC safety regulations, male students cannot enter Girls Hostels. All handovers happen at designated campus common points.",
+    };
+  }
+
+  // If female-to-female or male-to-male or male-target:
+  return {
+    location: `${targetHostel || "Campus"}, ${targetRoom || "Room 214"}`,
+    isMasked: false,
+  };
+}
+
+export function canAccessDirectContact(
+  targetHostel?: string | null,
+  viewerHostel?: string | null,
+  femaleConsentGranted: boolean = false
+): boolean {
+  const isTargetFemale = isFemaleHostel(targetHostel);
+  const isViewerFemale = isFemaleHostel(viewerHostel);
+
+  // If target is female and viewer is male, require explicit female consent
+  if (isTargetFemale && !isViewerFemale) {
+    return femaleConsentGranted;
+  }
+
+  // Female-to-female or normal peer collaboration
+  return true;
 }
 
 export function getWhatsAppUrl(phone?: string | null, message?: string): string {

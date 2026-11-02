@@ -13,9 +13,11 @@ import {
   ArrowLeft,
   Copy,
   Check,
+  MapPin,
+  HeartHandshake,
 } from "lucide-react";
 import { Gig, Profile } from "@/types/database.types";
-import { getWhatsAppUrl, getTelUrl } from "@/lib/contact";
+import { getWhatsAppUrl, getTelUrl, isFemaleHostel, maskPhoneNumber } from "@/lib/contact";
 
 interface GigLifecycleViewProps {
   gig: Gig;
@@ -23,6 +25,7 @@ interface GigLifecycleViewProps {
   onBack: () => void;
   onConfirmCompletion: (gigId: string) => void;
   onConsentContact: (gigId: string) => void;
+  currentUser?: Profile;
 }
 
 export function GigLifecycleView({
@@ -31,9 +34,11 @@ export function GigLifecycleView({
   onBack,
   onConfirmCompletion,
   onConsentContact,
+  currentUser,
 }: GigLifecycleViewProps) {
   const [contactShared, setContactShared] = useState(true); // Demo default unlocked or toggleable
   const [copied, setCopied] = useState(false);
+  const [femaleConsentApproved, setFemaleConsentApproved] = useState(false);
   const [hasConfirmed, setHasConfirmed] = useState(
     gig.status === "COMPLETED" || gig.status === "COMPLETION_PENDING"
   );
@@ -175,57 +180,128 @@ export function GigLifecycleView({
               Consent-Based Direct Contact
             </h4>
           </div>
-          <span className="text-[10px] text-[#64748B]">Privacy Protected</span>
+          <span className="text-[10px] text-[#64748B]">
+            {isFemaleHostel(otherParty?.hostel_block) ? "GH Privacy Shield" : "Privacy Protected"}
+          </span>
         </div>
+
+        {/* Girls Hostel Privacy Shield Banner */}
+        {isFemaleHostel(otherParty?.hostel_block) && !isFemaleHostel(currentUser?.hostel_block) && (
+          <div className="p-3 bg-[#FAF5FF] border border-[#E9D5FF] rounded-xl flex items-start gap-2.5">
+            <ShieldCheck className="w-4 h-4 text-[#9333EA] shrink-0 mt-0.5" />
+            <div className="flex-1 text-xs">
+              <div className="flex items-center gap-1.5 font-bold text-[#6B21A8]">
+                <span>Girls Hostel Privacy Shield Active</span>
+                <span className="text-[9px] px-1.5 py-0.2 bg-[#F3E8FF] rounded font-bold">JEC Rules</span>
+              </div>
+              <p className="text-[11px] text-[#7E22CE]/80 leading-relaxed mt-0.5">
+                Per campus safety regulations, male students cannot enter Girls Hostels. Room handovers are relocated to campus common hubs, and direct phone contact requires female approval.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Mutual Female Peer Trust Banner */}
+        {isFemaleHostel(otherParty?.hostel_block) && isFemaleHostel(currentUser?.hostel_block) && (
+          <div className="p-2.5 bg-[#ECFDF5] border border-[#A7F3D0] rounded-xl flex items-center gap-2 text-xs text-[#059669]">
+            <HeartHandshake className="w-4 h-4 shrink-0" />
+            <span className="font-semibold text-[11px]">
+              Verified Girls Hostel Peer Collaboration — Full room & WhatsApp details unlocked.
+            </span>
+          </div>
+        )}
 
         {contactShared ? (
           <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 flex flex-col gap-2.5">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-[#64748B]">Hostel & Room:</span>
-              <strong className="text-[#0F172A]">
-                {otherParty?.hostel_block}, {otherParty?.room_number || "Room 214"}
+              <span className="text-[#64748B]">Coordination Meeting Point:</span>
+              <strong className="text-[#0F172A] text-right">
+                {isFemaleHostel(otherParty?.hostel_block) && !isFemaleHostel(currentUser?.hostel_block)
+                  ? "Campus Common Hub (Central Library / Admin Canteen / GH Gate)"
+                  : `${otherParty?.hostel_block}, ${otherParty?.room_number || "Room 214"}`}
               </strong>
             </div>
+
             <div className="flex items-center justify-between text-xs">
               <span className="text-[#64748B]">Phone Number:</span>
               <div className="flex items-center gap-1.5">
-                <strong className="text-[#0F172A]">{otherParty?.phone_number || "+91 9876543210"}</strong>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(otherParty?.phone_number || "+919876543210");
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                  }}
-                  className="p-1 hover:bg-[#E2E8F0] rounded text-[#64748B] hover:text-[#0F172A]"
-                  title="Copy Phone Number"
-                >
-                  {copied ? <Check className="w-3.5 h-3.5 text-[#059669]" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
+                <strong className="text-[#0F172A]">
+                  {isFemaleHostel(otherParty?.hostel_block) &&
+                  !isFemaleHostel(currentUser?.hostel_block) &&
+                  !femaleConsentApproved
+                    ? maskPhoneNumber(otherParty?.phone_number)
+                    : otherParty?.phone_number || "+91 9876543210"}
+                </strong>
+                {(!isFemaleHostel(otherParty?.hostel_block) ||
+                  isFemaleHostel(currentUser?.hostel_block) ||
+                  femaleConsentApproved) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(otherParty?.phone_number || "+919876543210");
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                    className="p-1 hover:bg-[#E2E8F0] rounded text-[#64748B] hover:text-[#0F172A]"
+                    title="Copy Phone Number"
+                  >
+                    {copied ? <Check className="w-3.5 h-3.5 text-[#059669]" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                )}
               </div>
             </div>
 
+            {/* Female Student Explicit Approval Action */}
+            {isFemaleHostel(currentUser?.hostel_block) &&
+              !isFemaleHostel(otherParty?.hostel_block) &&
+              !femaleConsentApproved && (
+                <div className="pt-2 border-t border-[#E2E8F0] flex flex-col gap-1.5">
+                  <span className="text-[11px] text-[#64748B]">
+                    Do you want to share your WhatsApp and phone number with {otherParty?.full_name}?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setFemaleConsentApproved(true)}
+                    className="hh-btn-primary py-2 text-xs font-bold bg-[#9333EA] hover:bg-[#7E22CE] border-none flex items-center justify-center gap-1.5"
+                  >
+                    <Unlock className="w-3.5 h-3.5" />
+                    <span>Approve Contact Share with {otherParty?.full_name}</span>
+                  </button>
+                </div>
+              )}
+
             {/* External Coordination Handover Action */}
             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#E2E8F0]">
-              <a
-                href={getWhatsAppUrl(
-                  otherParty?.phone_number,
-                  `Hi ${otherParty?.full_name || "peer"}, I am coordinating with you for our HostelHire gig (Agreed: ₹${gig.agreed_price}). Are you free to talk/meet?`
-                )}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hh-btn-secondary py-2 text-xs flex items-center justify-center gap-1.5 bg-[#ECFDF5] border-[#A7F3D0] text-[#059669] font-bold hover:bg-[#D1FAE5]"
-              >
-                <MessageCircle className="w-3.5 h-3.5" />
-                <span>WhatsApp</span>
-              </a>
-              <a
-                href={getTelUrl(otherParty?.phone_number)}
-                className="hh-btn-secondary py-2 text-xs flex items-center justify-center gap-1.5 font-bold hover:bg-[#F1F5F9]"
-              >
-                <Phone className="w-3.5 h-3.5 text-[#475569]" />
-                <span>Call Peer</span>
-              </a>
+              {isFemaleHostel(otherParty?.hostel_block) &&
+              !isFemaleHostel(currentUser?.hostel_block) &&
+              !femaleConsentApproved ? (
+                <div className="col-span-2 py-2 px-3 bg-[#F1F5F9] border border-[#CBD5E1] rounded-lg text-center text-xs text-[#64748B] font-medium flex items-center justify-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-[#94A3B8]" />
+                  <span>Awaiting Female Student Approval to Reveal Contact</span>
+                </div>
+              ) : (
+                <>
+                  <a
+                    href={getWhatsAppUrl(
+                      otherParty?.phone_number,
+                      `Hi ${otherParty?.full_name || "peer"}, I am coordinating with you for our HostelHire gig (Agreed: ₹${gig.agreed_price}). Are you free to coordinate?`
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hh-btn-secondary py-2 text-xs flex items-center justify-center gap-1.5 bg-[#ECFDF5] border-[#A7F3D0] text-[#059669] font-bold hover:bg-[#D1FAE5]"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>WhatsApp</span>
+                  </a>
+                  <a
+                    href={getTelUrl(otherParty?.phone_number)}
+                    className="hh-btn-secondary py-2 text-xs flex items-center justify-center gap-1.5 font-bold hover:bg-[#F1F5F9]"
+                  >
+                    <Phone className="w-3.5 h-3.5 text-[#475569]" />
+                    <span>Call Peer</span>
+                  </a>
+                </>
+              )}
             </div>
           </div>
         ) : (

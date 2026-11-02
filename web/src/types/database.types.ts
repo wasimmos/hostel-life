@@ -63,6 +63,7 @@ export interface ServiceListing {
   indicative_price: number;
   turnaround_time: string;
   is_active: boolean;
+  girls_hostel_only?: boolean;
   created_at: string;
   updated_at: string;
   // Joined relation:
@@ -78,6 +79,7 @@ export interface ServiceRequest {
   expected_budget: number;
   urgency: string;
   is_open: boolean;
+  girls_hostel_only?: boolean;
   created_at: string;
   updated_at: string;
   // Joined relation:

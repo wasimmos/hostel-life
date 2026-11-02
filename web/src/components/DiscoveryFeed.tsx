@@ -1,15 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, ShieldCheck, Clock, Zap, ArrowRight, MessageSquarePlus, MessageCircle } from "lucide-react";
-import { ServiceListing, ServiceRequest } from "@/types/database.types";
-import { getWhatsAppUrl } from "@/lib/contact";
+import { Search, ShieldCheck, Clock, Zap, ArrowRight, MessageSquarePlus, MessageCircle, Lock } from "lucide-react";
+import { ServiceListing, ServiceRequest, Profile } from "@/types/database.types";
+import { getWhatsAppUrl, isFemaleHostel, canAccessDirectContact, maskPhoneNumber } from "@/lib/contact";
 
 interface DiscoveryFeedProps {
   listings: (ServiceListing & { provider: any })[];
   requests: (ServiceRequest & { seeker: any })[];
   onSelectListing: (listing: ServiceListing) => void;
   onSelectRequest: (request: ServiceRequest) => void;
+  currentUser?: Profile;
 }
 
 export function DiscoveryFeed({
@@ -17,6 +18,7 @@ export function DiscoveryFeed({
   requests,
   onSelectListing,
   onSelectRequest,
+  currentUser,
 }: DiscoveryFeedProps) {
   const [mode, setMode] = useState<"services" | "requests">("services");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
@@ -137,6 +139,11 @@ export function DiscoveryFeed({
                           {listing.provider?.full_name}
                         </span>
                         <ShieldCheck className="w-3.5 h-3.5 text-[#059669]" />
+                        {isFemaleHostel(listing.provider?.hostel_block) && (
+                          <span className="text-[9px] px-1.5 py-0.2 bg-[#F3E8FF] text-[#7E22CE] border border-[#E9D5FF] rounded font-bold">
+                            GH Protected
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-1.5 text-[11px] text-[#64748B]">
                         <span>{listing.provider?.hostel_block}</span>
@@ -146,12 +153,21 @@ export function DiscoveryFeed({
                     </div>
                   </div>
                   <span className="hh-badge-hostel text-[10px]">
-                    {listing.provider?.room_number || "Verified"}
+                    {isFemaleHostel(listing.provider?.hostel_block) && !isFemaleHostel(currentUser?.hostel_block)
+                      ? "Common Hub"
+                      : listing.provider?.room_number || "Verified"}
                   </span>
                 </div>
 
                 {/* Body: Title & Description */}
                 <div>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    {listing.girls_hostel_only && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FAF5FF] text-[#9333EA] border border-[#E9D5FF]">
+                        👩‍🎓 Girls Hostel Only
+                      </span>
+                    )}
+                  </div>
                   <h3 className="text-sm font-bold text-[#0F172A] leading-snug">
                     {listing.title}
                   </h3>
@@ -173,19 +189,28 @@ export function DiscoveryFeed({
                   </div>
 
                   <div className="flex items-center gap-1.5">
-                    <a
-                      href={getWhatsAppUrl(
-                        listing.provider?.phone_number,
-                        `Hi ${listing.provider?.full_name || "peer"}, I saw your HostelHire listing "${listing.title}" (₹${listing.indicative_price}). Are you available to help?`
-                      )}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="p-1.5 rounded-lg border border-[#A7F3D0] bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5] transition-colors flex items-center justify-center"
-                      title="Direct WhatsApp Message"
-                    >
-                      <MessageCircle className="w-3.5 h-3.5" />
-                    </a>
+                    {canAccessDirectContact(listing.provider?.hostel_block, currentUser?.hostel_block) ? (
+                      <a
+                        href={getWhatsAppUrl(
+                          listing.provider?.phone_number,
+                          `Hi ${listing.provider?.full_name || "peer"}, I saw your HostelHire listing "${listing.title}" (₹${listing.indicative_price}). Are you available to help?`
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1.5 rounded-lg border border-[#A7F3D0] bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5] transition-colors flex items-center justify-center"
+                        title="Direct WhatsApp Message"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                      </a>
+                    ) : (
+                      <span
+                        className="p-1.5 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-[#94A3B8] flex items-center justify-center"
+                        title="Privacy Shield: Contact protected. Apply to request consent."
+                      >
+                        <Lock className="w-3.5 h-3.5" />
+                      </span>
+                    )}
 
                     <button className="hh-btn-primary py-1 px-2.5 text-xs flex items-center gap-1">
                       <span>Express Interest</span>
@@ -217,6 +242,11 @@ export function DiscoveryFeed({
                   <span className="text-[11px] text-[#64748B]">
                     {request.seeker?.hostel_block}
                   </span>
+                  {isFemaleHostel(request.seeker?.hostel_block) && (
+                    <span className="text-[9px] px-1.5 py-0.2 bg-[#F3E8FF] text-[#7E22CE] border border-[#E9D5FF] rounded font-bold">
+                      GH Protected
+                    </span>
+                  )}
                 </div>
                 <span className="text-xs font-bold text-[#059669]">
                   Budget: ₹{request.expected_budget}
@@ -225,6 +255,13 @@ export function DiscoveryFeed({
 
               {/* Body: Title & Need */}
               <div>
+                <div className="flex items-center gap-1.5 mb-1">
+                  {request.girls_hostel_only && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FAF5FF] text-[#9333EA] border border-[#E9D5FF]">
+                      👩‍🎓 Girls Hostel Only
+                    </span>
+                  )}
+                </div>
                 <h3 className="text-sm font-bold text-[#0F172A] leading-snug">
                   {request.title}
                 </h3>
@@ -240,19 +277,28 @@ export function DiscoveryFeed({
                 </span>
 
                 <div className="flex items-center gap-1.5">
-                  <a
-                    href={getWhatsAppUrl(
-                      request.seeker?.phone_number,
-                      `Hi ${request.seeker?.full_name || "peer"}, I saw your HostelHire request "${request.title}" (Budget: ₹${request.expected_budget}). I can help you with this!`
-                    )}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="p-1.5 rounded-lg border border-[#A7F3D0] bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5] transition-colors flex items-center justify-center"
-                    title="Direct WhatsApp Message"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                  </a>
+                  {canAccessDirectContact(request.seeker?.hostel_block, currentUser?.hostel_block) ? (
+                    <a
+                      href={getWhatsAppUrl(
+                        request.seeker?.phone_number,
+                        `Hi ${request.seeker?.full_name || "peer"}, I saw your HostelHire request "${request.title}" (Budget: ₹${request.expected_budget}). I can help you with this!`
+                      )}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="p-1.5 rounded-lg border border-[#A7F3D0] bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5] transition-colors flex items-center justify-center"
+                      title="Direct WhatsApp Message"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                    </a>
+                  ) : (
+                    <span
+                      className="p-1.5 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-[#94A3B8] flex items-center justify-center"
+                      title="Privacy Shield: Contact protected. Tap Offer to Help."
+                    >
+                      <Lock className="w-3.5 h-3.5" />
+                    </span>
+                  )}
 
                   <button className="hh-btn-secondary py-1 px-2.5 text-xs flex items-center gap-1 text-[#1E40AF] font-bold">
                     <MessageSquarePlus className="w-3 h-3" />

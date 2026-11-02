@@ -200,6 +200,28 @@ export default function Home() {
         phone_number: "+91 9876543213",
       },
     },
+    {
+      id: "b3",
+      seeker_id: "22222222-2222-2222-2222-222222222222",
+      title: "Need senior peer tutor for Digital Signal Processing (GH 2)",
+      description: "Looking for a female senior in GH 2 to clarify FFT & IIR filter derivations in hostel study room before internal test.",
+      skill_category: "Academic Support",
+      expected_budget: 150,
+      urgency: "This Weekend",
+      is_open: true,
+      girls_hostel_only: true,
+      created_at: "2026-10-30T10:00:00.000Z",
+      updated_at: "2026-10-30T10:00:00.000Z",
+      seeker: {
+        id: "22222222-2222-2222-2222-222222222222",
+        full_name: "Rhea Goswami",
+        department: "Computer Science",
+        semester: 5,
+        hostel_block: "Girls Hostel 2",
+        room_number: "Room 108",
+        phone_number: "+91 9876543211",
+      },
+    },
   ]);
 
   // Gigs State
@@ -411,6 +433,7 @@ export default function Home() {
           <GigLifecycleView
             gig={selectedGig}
             currentUserRole={selectedGig.seeker_id === user.id ? "seeker" : "provider"}
+            currentUser={user}
             onBack={() => setSelectedGig(null)}
             onConfirmCompletion={handleConfirmGigCompletion}
             onConsentContact={() => {}}
@@ -419,6 +442,7 @@ export default function Home() {
           <DiscoveryFeed
             listings={listings}
             requests={requests}
+            currentUser={user}
             onSelectListing={(listing) => {
               const existing = gigs.find((g) => g.source_id === listing.id);
               if (existing) {

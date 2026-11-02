@@ -22,6 +22,7 @@ export function PostModal({
   const [price, setPrice] = useState("");
   const [timeframe, setTimeframe] = useState("");
   const [description, setDescription] = useState("");
+  const [girlsHostelOnly, setGirlsHostelOnly] = useState(false);
 
   if (!isOpen) return null;
 
@@ -36,6 +37,7 @@ export function PostModal({
         indicative_price: parseFloat(price),
         turnaround_time: timeframe || "Within 24 Hours",
         description,
+        girls_hostel_only: girlsHostelOnly,
       });
     } else {
       onSubmitRequest({
@@ -44,6 +46,7 @@ export function PostModal({
         expected_budget: parseFloat(price),
         urgency: timeframe || "Needed Tonight",
         description,
+        girls_hostel_only: girlsHostelOnly,
       });
     }
 
@@ -168,6 +171,26 @@ export function PostModal({
               onChange={(e) => setDescription(e.target.value)}
               className="w-full p-2.5 bg-white border border-[#E2E8F0] rounded-lg text-xs text-[#0F172A] focus:outline-none focus:border-[#1E40AF]"
             />
+          </div>
+
+          {/* Girls Hostel Only Toggle */}
+          <div className="p-3 bg-[#FAF5FF] border border-[#E9D5FF] rounded-xl flex items-start gap-2.5">
+            <input
+              type="checkbox"
+              id="gh-only"
+              checked={girlsHostelOnly}
+              onChange={(e) => setGirlsHostelOnly(e.target.checked)}
+              className="mt-0.5 rounded text-[#9333EA] focus:ring-[#9333EA]"
+            />
+            <label htmlFor="gh-only" className="cursor-pointer">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-[#6B21A8]">Girls Hostel (GH) Only</span>
+                <span className="text-[9px] px-1.5 py-0.2 bg-[#F3E8FF] text-[#7E22CE] rounded-full font-bold">Privacy Shield</span>
+              </div>
+              <p className="text-[11px] text-[#7E22CE]/80 leading-snug mt-0.5">
+                Restrict this post and room visits exclusively to verified female hostel peers.
+              </p>
+            </label>
           </div>
 
           <button
