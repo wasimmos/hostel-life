@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/context/AuthContext";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   variable: "--font-plus-jakarta",
@@ -29,10 +30,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${plusJakartaSans.variable} font-sans antialiased`}>
       <body className="bg-[#F8FAFC] text-[#0F172A] min-h-screen flex justify-center">
-        {/* Mobile viewport container restricted to max-w-[480px] per DESIGN.md */}
-        <div className="w-full max-w-[480px] min-h-screen bg-[#F8FAFC] flex flex-col relative pb-20">
-          {children}
-        </div>
+        <AuthProvider>
+          <div className="w-full max-w-[480px] min-h-screen bg-[#F8FAFC] flex flex-col relative pb-20">
+            {children}
+          </div>
+        </AuthProvider>
       </body>
     </html>
   );
