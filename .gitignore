@@ -5,6 +5,11 @@ proposal.html
 generate_pdf.py
 assets/
 
+# Pitch deck files
+*pitchdeck*
+pitchdeck.html
+pitchdeck.md
+
 # Web dependencies and build cache
 web/node_modules/
 web/.next/
