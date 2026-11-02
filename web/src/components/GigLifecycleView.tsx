@@ -27,6 +27,7 @@ interface GigLifecycleViewProps {
   onConsentContact: (gigId: string) => void;
   onAcceptRequest?: (gigId: string) => void;
   onRejectRequest?: (gigId: string) => void;
+  onRequestService?: (gigId: string, note?: string) => void;
   currentUser?: Profile;
 }
 
@@ -38,14 +39,25 @@ export function GigLifecycleView({
   onConsentContact,
   onAcceptRequest,
   onRejectRequest,
+  onRequestService,
   currentUser,
 }: GigLifecycleViewProps) {
-  const [contactShared, setContactShared] = useState(true); // Demo default unlocked or toggleable
+  const [requestNote, setRequestNote] = useState("");
   const [copied, setCopied] = useState(false);
   const [femaleConsentApproved, setFemaleConsentApproved] = useState(false);
+  const [manualContactShared, setManualContactShared] = useState(false);
   const [hasConfirmed, setHasConfirmed] = useState(
     gig.status === "COMPLETED" || gig.status === "COMPLETION_PENDING"
   );
+
+  const isCrossGenderLocked =
+    isFemaleHostel(gig.provider?.hostel_block) &&
+    !isFemaleHostel(currentUser?.hostel_block) &&
+    gig.status !== "ACCEPTED" &&
+    gig.status !== "COMPLETED";
+
+  const contactShared = !isCrossGenderLocked || manualContactShared;
+  const setContactShared = (shared: boolean) => setManualContactShared(shared);
 
   const steps = [
     { key: "OPEN", label: "Open" },
@@ -109,7 +121,41 @@ export function GigLifecycleView({
         </div>
       </div>
 
-      {/* Girl-to-Boy Request Moderation & Decision Card */}
+      {/* 1. Cross-Gender Explicit Request Form (Boy requesting Girl's service) */}
+      {gig.status === "OPEN" && isFemaleHostel(gig.provider?.hostel_block) && !isFemaleHostel(currentUser?.hostel_block) && (
+        <div className="p-4 bg-[#FAF5FF] border border-[#E9D5FF] rounded-xl flex flex-col gap-3 shadow-xs">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-[#9333EA]" />
+            <div>
+              <span className="text-xs font-bold text-[#6B21A8] block">Request Service from {gig.provider?.full_name}</span>
+              <span className="text-[10px] text-[#7E22CE]">Girls Hostel ({gig.provider?.hostel_block}) • Campus Privacy Shield</span>
+            </div>
+          </div>
+          <p className="text-xs text-[#64748B] leading-relaxed">
+            Per campus safety policies, handover is coordinated at a campus common hub (Library / Admin Canteen). Direct contact details unlock only after <strong>{gig.provider?.full_name}</strong> reviews and accepts your request.
+          </p>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold text-[#475569]">Add Note / Requirements (Optional):</label>
+            <input
+              type="text"
+              placeholder="e.g. Need urgent formatting for S5 LaTeX lab manual before Friday..."
+              value={requestNote}
+              onChange={(e) => setRequestNote(e.target.value)}
+              className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-xs text-[#0F172A] focus:outline-none focus:border-[#9333EA]"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => onRequestService && onRequestService(gig.id, requestNote)}
+            className="w-full py-2.5 px-3 bg-[#9333EA] hover:bg-[#7E22CE] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs"
+          >
+            <HeartHandshake className="w-4 h-4" />
+            <span>Send Request to {gig.provider?.full_name} (₹{gig.agreed_price})</span>
+          </button>
+        </div>
+      )}
+
+      {/* 2. Girl-to-Boy Request Moderation & Decision Card (Pending Approval) */}
       {gig.status === "INTERESTED" && isFemaleHostel(gig.provider?.hostel_block) && (
         currentUserRole === "provider" ? (
           <div className="p-4 bg-[#FAF5FF] border border-[#E9D5FF] rounded-xl flex flex-col gap-3 shadow-xs">
@@ -162,6 +208,14 @@ export function GigLifecycleView({
             </p>
           </div>
         )
+      )}
+
+      {/* 3. Declined / Cancelled Alert */}
+      {gig.status === "CANCELLED" && (
+        <div className="p-3 bg-[#FEF2F2] border border-[#FCA5A5] rounded-xl flex items-center gap-2 text-xs text-[#DC2626]">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>Service request was declined. Coordination details remain locked.</span>
+        </div>
       )}
 
       {/* Visual Stepper */}

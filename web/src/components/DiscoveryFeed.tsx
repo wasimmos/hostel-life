@@ -233,10 +233,17 @@ export function DiscoveryFeed({
                       </span>
                     )}
 
-                    <button className="hh-btn-primary py-1 px-2.5 text-xs flex items-center gap-1">
-                      <span>Express Interest</span>
-                      <ArrowRight className="w-3 h-3" />
-                    </button>
+                    {isFemaleHostel(listing.provider?.hostel_block) && !isFemaleHostel(currentUser?.hostel_block) ? (
+                      <button className="py-1 px-2.5 text-xs font-bold rounded-lg bg-[#9333EA] hover:bg-[#7E22CE] text-white flex items-center gap-1 shadow-xs transition-colors">
+                        <span>Request Service</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    ) : (
+                      <button className="hh-btn-primary py-1 px-2.5 text-xs flex items-center gap-1">
+                        <span>Express Interest</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

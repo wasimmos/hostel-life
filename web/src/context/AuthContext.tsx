@@ -106,10 +106,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const savedLogin = localStorage.getItem("hostelhire_logged_in");
       const savedUserId = localStorage.getItem("hostelhire_user_id");
+      const savedUserProfile = localStorage.getItem("hostelhire_user_profile");
 
       if (savedLogin === "true") {
         setIsAuthenticated(true);
-        if (savedUserId) {
+        if (savedUserProfile) {
+          try {
+            const parsed = JSON.parse(savedUserProfile);
+            if (parsed && parsed.id) {
+              setCurrentUser(parsed);
+            }
+          } catch {}
+        } else if (savedUserId) {
           const match = DEMO_PROFILES.find((p) => p.id === savedUserId);
           if (match) setCurrentUser(match);
         }
@@ -122,56 +130,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const checkSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
+        const savedUserId = localStorage.getItem("hostelhire_user_id");
+        if (savedUserId) {
           const { data: profile } = await supabase
             .from("profiles")
             .select("*")
-            .eq("id", session.user.id)
-            .single();
+            .eq("id", savedUserId)
+            .maybeSingle();
 
           if (profile) {
             setCurrentUser(profile);
-            setIsRealAuth(true);
             setIsAuthenticated(true);
             localStorage.setItem("hostelhire_logged_in", "true");
             localStorage.setItem("hostelhire_user_id", profile.id);
+            localStorage.setItem("hostelhire_user_profile", JSON.stringify(profile));
           }
         }
       } catch (e) {
-        console.error("Auth session check error:", e);
+        console.error("Auth session check notice:", e);
       }
     };
 
     checkSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session?.user) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", session.user.id)
-            .single();
-          if (profile) {
-            setCurrentUser(profile);
-            setIsRealAuth(true);
-            setIsAuthenticated(true);
-            localStorage.setItem("hostelhire_logged_in", "true");
-            localStorage.setItem("hostelhire_user_id", profile.id);
-          }
-        } else if (event === "SIGNED_OUT") {
-          setIsRealAuth(false);
-          setIsAuthenticated(false);
-          localStorage.removeItem("hostelhire_logged_in");
-          setCurrentUser(DEMO_PROFILES[0]);
-        }
-      }
-    );
-
-    return () => {
-      subscription.unsubscribe();
-    };
   }, []);
 
   const setDirectLogin = (logged: boolean) => {
@@ -179,8 +159,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (logged) {
       localStorage.setItem("hostelhire_logged_in", "true");
       localStorage.setItem("hostelhire_user_id", currentUser.id);
+      localStorage.setItem("hostelhire_user_profile", JSON.stringify(currentUser));
     } else {
       localStorage.removeItem("hostelhire_logged_in");
+      localStorage.removeItem("hostelhire_user_profile");
     }
   };
 
@@ -190,6 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setCurrentUser(found);
       setIsRealAuth(false);
       localStorage.setItem("hostelhire_user_id", found.id);
+      localStorage.setItem("hostelhire_user_profile", JSON.stringify(found));
     }
   };
 
@@ -206,6 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         localStorage.setItem("hostelhire_logged_in", "true");
         localStorage.setItem("hostelhire_user_id", DEMO_PROFILES[0].id);
+        localStorage.setItem("hostelhire_user_profile", JSON.stringify(DEMO_PROFILES[0]));
       } catch {}
       return {};
     }
@@ -219,6 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         localStorage.setItem("hostelhire_logged_in", "true");
         localStorage.setItem("hostelhire_user_id", DEMO_PROFILES[1].id);
+        localStorage.setItem("hostelhire_user_profile", JSON.stringify(DEMO_PROFILES[1]));
       } catch {}
       return {};
     }
@@ -237,6 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           localStorage.setItem("hostelhire_logged_in", "true");
           localStorage.setItem("hostelhire_user_id", profile.id);
+          localStorage.setItem("hostelhire_user_profile", JSON.stringify(profile));
         } catch {}
         return {};
       }
@@ -244,54 +230,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.warn("Direct profile query check:", e);
     }
 
-    // 3. Fallback to Supabase Auth password check if available
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
-      if (data?.user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", data.user.id)
-          .single();
-        if (profile) setCurrentUser(profile);
-        setIsRealAuth(true);
-        setIsAuthenticated(true);
-        return {};
-      }
-      if (error) return { error: error.message };
-      return {};
-    } catch (err: any) {
-      return { error: err.message || "Failed to sign in. Please verify your credentials." };
-    }
+    return {
+      error: "Account not found for this email. Please register under 'New Student Registration' or sign in with Wasim / Rhea.",
+    };
   };
 
   const signUp = async (payload: SignUpPayload) => {
-    let assignedUserId = "";
-
-    // 1. Try Supabase Auth signUp if possible
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email: payload.email,
-        password: payload.password,
-      });
-
-      if (data?.user?.id) {
-        assignedUserId = data.user.id;
-      } else if (error) {
-        console.warn("Supabase Auth email signup notice:", error.message);
+    // Generate valid RFC-compliant UUID
+    const generateUUID = () => {
+      if (typeof crypto !== "undefined" && crypto.randomUUID) {
+        return crypto.randomUUID();
       }
-    } catch (authErr) {
-      console.warn("Auth signup error, falling back to direct profile registration:", authErr);
-    }
+      return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+        const r = (Math.random() * 16) | 0;
+        const v = c === "x" ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      });
+    };
 
-    // If Auth email was rate-limited or bypassed, generate clean unique student UUID
-    if (!assignedUserId) {
-      assignedUserId = typeof crypto !== "undefined" && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `student-${Date.now()}`;
-    }
+    const assignedUserId = generateUUID();
 
-    // 2. Insert directly into Supabase 'profiles' table
+    // Insert directly into Supabase 'profiles' table
     try {
       const { error: profileError } = await supabase.from("profiles").upsert(
         {
@@ -317,7 +276,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.warn("Profile table insert fallback:", e);
     }
 
-    // 3. Immediately log the student in with their real profile data
+    // Immediately log the student in with their real profile data
     const newRegisteredUser: Profile = {
       id: assignedUserId,
       full_name: payload.full_name,
@@ -339,6 +298,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem("hostelhire_logged_in", "true");
       localStorage.setItem("hostelhire_user_id", newRegisteredUser.id);
+      localStorage.setItem("hostelhire_user_profile", JSON.stringify(newRegisteredUser));
     } catch {}
 
     return {};

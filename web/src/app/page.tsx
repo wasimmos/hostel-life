@@ -297,6 +297,21 @@ export default function Home() {
   };
 
   useEffect(() => {
+    // Rehydrate any local saved gigs so they persist across page restarts
+    try {
+      const saved = localStorage.getItem("hostelhire_saved_gigs");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setGigs((prev) => {
+            const existingIds = new Set(prev.map((g) => g.id));
+            const extra = parsed.filter((g: any) => !existingIds.has(g.id));
+            return [...extra, ...prev];
+          });
+        }
+      }
+    } catch {}
+
     loadData();
     // 5-second polling interval so listings posted on one mobile appear on another immediately
     const pollInterval = setInterval(loadData, 5000);
@@ -353,12 +368,14 @@ export default function Home() {
       indicative_price: data.indicative_price,
       turnaround_time: data.turnaround_time,
       is_active: true,
+      girls_hostel_only: data.girls_hostel_only,
     };
 
     try {
-      await createServiceListing(payload);
+      await createServiceListing(payload, user);
       await loadData();
-    } catch {
+    } catch (err) {
+      console.warn("Listing creation fallback notice:", err);
       // Local optimistic fallback
       const localItem = {
         id: `a-${Date.now()}`,
@@ -382,12 +399,14 @@ export default function Home() {
       expected_budget: data.expected_budget,
       urgency: data.urgency,
       is_open: true,
+      girls_hostel_only: data.girls_hostel_only,
     };
 
     try {
-      await createServiceRequest(payload);
+      await createServiceRequest(payload, user);
       await loadData();
-    } catch {
+    } catch (err) {
+      console.warn("Request creation fallback notice:", err);
       // Local optimistic fallback
       const localItem = {
         id: `b-${Date.now()}`,
@@ -409,18 +428,64 @@ export default function Home() {
       // Fallback local update
     }
 
-    setGigs((prev) =>
-      prev.map((g) => (g.id === gigId ? { ...g, status: "COMPLETED" as const } : g))
-    );
+    setGigs((prev) => {
+      const updated = prev.map((g) => (g.id === gigId ? { ...g, status: "COMPLETED" as const } : g));
+      try { localStorage.setItem("hostelhire_saved_gigs", JSON.stringify(updated)); } catch {}
+      return updated;
+    });
     if (selectedGig && selectedGig.id === gigId) {
       setSelectedGig({ ...selectedGig, status: "COMPLETED" });
     }
   };
 
+  const handleSendServiceRequest = async (gigId: string, note?: string) => {
+    setGigs((prev) => {
+      const updated = prev.map((g) => (g.id === gigId ? { ...g, status: "INTERESTED" as const } : g));
+      try { localStorage.setItem("hostelhire_saved_gigs", JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+
+    if (selectedGig && selectedGig.id === gigId) {
+      setSelectedGig((prev) => (prev ? { ...prev, status: "INTERESTED" } : null));
+    }
+
+    const gigObj = gigs.find((g) => g.id === gigId) || selectedGig;
+    const providerName = (gigObj as any)?.provider?.full_name || "Female Provider";
+
+    setNotifications((prev) => [
+      {
+        id: `notif-${Date.now()}`,
+        title: "Service Request Sent ⚡",
+        message: `Your request was sent to ${providerName}. Awaiting approval.`,
+        time: "Just now",
+        read: false,
+        type: "gig",
+      },
+      ...prev,
+    ]);
+
+    // Cross-device sync to Supabase so the girl's mobile fetches the request in realtime
+    try {
+      await createServiceRequest({
+        seeker_id: user.id,
+        title: `[Service Request] ${(gigObj as any)?.provider?.full_name || 'Service'}`,
+        description: note || `Service requested by ${user.full_name} (${user.hostel_block})`,
+        skill_category: "Academic Support",
+        expected_budget: gigObj?.agreed_price || 80,
+        urgency: "Request Pending Approval",
+        is_open: true,
+      }, user);
+    } catch (e) {
+      console.warn("Supabase moderation request sync notice:", e);
+    }
+  };
+
   const handleAcceptServiceRequest = (gigId: string) => {
-    setGigs((prev) =>
-      prev.map((g) => (g.id === gigId ? { ...g, status: "ACCEPTED" as const } : g))
-    );
+    setGigs((prev) => {
+      const updated = prev.map((g) => (g.id === gigId ? { ...g, status: "ACCEPTED" as const } : g));
+      try { localStorage.setItem("hostelhire_saved_gigs", JSON.stringify(updated)); } catch {}
+      return updated;
+    });
     if (selectedGig && selectedGig.id === gigId) {
       setSelectedGig((prev) => (prev ? { ...prev, status: "ACCEPTED" } : null));
     }
@@ -428,7 +493,7 @@ export default function Home() {
       {
         id: `notif-${Date.now()}`,
         title: "Request Approved! ⚡",
-        message: "Service request accepted. Campus phone & WhatsApp coordination unlocked.",
+        message: "Service request accepted. Campus Common Hub meeting & contact unlocked.",
         time: "Just now",
         read: false,
         type: "gig",
@@ -438,9 +503,11 @@ export default function Home() {
   };
 
   const handleRejectServiceRequest = (gigId: string) => {
-    setGigs((prev) =>
-      prev.map((g) => (g.id === gigId ? { ...g, status: "CANCELLED" as const } : g))
-    );
+    setGigs((prev) => {
+      const updated = prev.map((g) => (g.id === gigId ? { ...g, status: "CANCELLED" as const } : g));
+      try { localStorage.setItem("hostelhire_saved_gigs", JSON.stringify(updated)); } catch {}
+      return updated;
+    });
     if (selectedGig && selectedGig.id === gigId) {
       setSelectedGig((prev) => (prev ? { ...prev, status: "CANCELLED" } : null));
     }
@@ -491,6 +558,7 @@ export default function Home() {
             onBack={() => setSelectedGig(null)}
             onConfirmCompletion={handleConfirmGigCompletion}
             onConsentContact={() => {}}
+            onRequestService={handleSendServiceRequest}
             onAcceptRequest={handleAcceptServiceRequest}
             onRejectRequest={handleRejectServiceRequest}
           />
@@ -518,27 +586,13 @@ export default function Home() {
                   provider_id: listing.provider_id,
                   accepted_interest_id: `int-${Date.now()}`,
                   agreed_price: listing.indicative_price,
-                  status: requiresModeration ? "INTERESTED" : "ACCEPTED",
+                  status: requiresModeration ? "OPEN" : "ACCEPTED",
                   created_at: new Date().toISOString(),
                   seeker: user,
                   provider: (listing as any).provider,
                 };
                 setGigs([newGig, ...gigs]);
                 setSelectedGig(newGig);
-
-                if (requiresModeration) {
-                  setNotifications((prev) => [
-                    {
-                      id: `notif-${Date.now()}`,
-                      title: "Service Request Sent 💬",
-                      message: `Your request for '${listing.title}' was sent to ${(listing as any).provider?.full_name || "provider"}. Awaiting approval.`,
-                      time: "Just now",
-                      read: false,
-                      type: "gig",
-                    },
-                    ...prev,
-                  ]);
-                }
               }
             }}
             onSelectRequest={(request) => {
