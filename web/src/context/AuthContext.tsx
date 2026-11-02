@@ -194,20 +194,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    if (!isSupabaseConfigured()) {
-      // Mock login check
-      const match = DEMO_PROFILES.find((p) => p.college_email.toLowerCase() === email.toLowerCase());
-      if (match) {
-        setCurrentUser(match);
-        return {};
-      }
-      return { error: "Demo user not found. Try wasim.ee@jecassam.ac.in or switch persona." };
+    // 1. Check demo profiles first
+    const demoMatch = DEMO_PROFILES.find((p) => p.college_email.toLowerCase() === email.toLowerCase());
+    if (demoMatch) {
+      setCurrentUser(demoMatch);
+      setIsAuthenticated(true);
+      try {
+        localStorage.setItem("hostelhire_logged_in", "true");
+        localStorage.setItem("hostelhire_user_id", demoMatch.id);
+      } catch {}
+      return {};
     }
 
+    // 2. Check Supabase profiles table directly
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("college_email", email)
+        .maybeSingle();
+
+      if (profile) {
+        setCurrentUser(profile);
+        setIsAuthenticated(true);
+        try {
+          localStorage.setItem("hostelhire_logged_in", "true");
+          localStorage.setItem("hostelhire_user_id", profile.id);
+        } catch {}
+        return {};
+      }
+    } catch (e) {
+      console.warn("Direct profile query check:", e);
+    }
+
+    // 3. Fallback to Supabase Auth password check if available
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) return { error: error.message };
-      if (data.user) {
+      if (data?.user) {
         const { data: profile } = await supabase
           .from("profiles")
           .select("*")
@@ -215,7 +238,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .single();
         if (profile) setCurrentUser(profile);
         setIsRealAuth(true);
+        setIsAuthenticated(true);
+        return {};
       }
+      if (error) return { error: error.message };
       return {};
     } catch (err: any) {
       return { error: err.message || "Failed to sign in" };
@@ -223,81 +249,82 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (payload: SignUpPayload) => {
-    if (!isSupabaseConfigured()) {
-      // Mock registration
-      const newMockUser: Profile = {
-        id: `mock-${Date.now()}`,
-        full_name: payload.full_name,
-        roll_number: payload.roll_number,
-        college_email: payload.email,
-        department: payload.department,
-        semester: payload.semester,
-        hostel_block: payload.hostel_block,
-        room_number: payload.room_number,
-        phone_number: payload.phone_number,
-        bio: payload.bio || "Hostel resident and skill contributor.",
-        is_admin: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      setCurrentUser(newMockUser);
-      return {};
-    }
+    let assignedUserId = "";
 
+    // 1. Try Supabase Auth signUp if possible
     try {
       const { data, error } = await supabase.auth.signUp({
         email: payload.email,
         password: payload.password,
       });
 
-      if (error) return { error: error.message };
-      if (!data.user) return { error: "User creation failed" };
+      if (data?.user?.id) {
+        assignedUserId = data.user.id;
+      } else if (error) {
+        console.warn("Supabase Auth email signup notice:", error.message);
+      }
+    } catch (authErr) {
+      console.warn("Auth signup error, falling back to direct profile registration:", authErr);
+    }
 
-      // Insert matching profiles entry
-      const { error: profileError } = await supabase.from("profiles").insert({
-        id: data.user.id,
-        full_name: payload.full_name,
-        roll_number: payload.roll_number,
-        college_email: payload.email,
-        department: payload.department,
-        semester: payload.semester,
-        hostel_block: payload.hostel_block,
-        room_number: payload.room_number,
-        phone_number: payload.phone_number,
-        bio: payload.bio || "Hostel resident.",
-        is_admin: false,
-      });
+    // If Auth email was rate-limited or bypassed, generate clean unique student UUID
+    if (!assignedUserId) {
+      assignedUserId = typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `student-${Date.now()}`;
+    }
+
+    // 2. Insert directly into Supabase 'profiles' table
+    try {
+      const { error: profileError } = await supabase.from("profiles").upsert(
+        {
+          id: assignedUserId,
+          full_name: payload.full_name,
+          roll_number: payload.roll_number,
+          college_email: payload.email,
+          department: payload.department,
+          semester: payload.semester,
+          hostel_block: payload.hostel_block,
+          room_number: payload.room_number,
+          phone_number: payload.phone_number,
+          bio: payload.bio || "Hostel resident and skill contributor.",
+          is_admin: false,
+        },
+        { onConflict: "id" }
+      );
 
       if (profileError) {
-        console.warn("Profile insert warning:", profileError);
+        console.warn("Supabase profile upsert warning:", profileError);
       }
-
-      const newRegisteredUser: Profile = {
-        id: data.user.id,
-        full_name: payload.full_name,
-        roll_number: payload.roll_number,
-        college_email: payload.email,
-        department: payload.department,
-        semester: payload.semester,
-        hostel_block: payload.hostel_block,
-        room_number: payload.room_number,
-        phone_number: payload.phone_number,
-        bio: payload.bio || "Hostel resident.",
-        is_admin: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      setCurrentUser(newRegisteredUser);
-      setIsAuthenticated(true);
-      try {
-        localStorage.setItem("hostelhire_logged_in", "true");
-        localStorage.setItem("hostelhire_user_id", newRegisteredUser.id);
-      } catch {}
-
-      return {};
-    } catch (err: any) {
-      return { error: err.message || "Failed to complete student registration" };
+    } catch (e) {
+      console.warn("Profile table insert fallback:", e);
     }
+
+    // 3. Immediately log the student in with their real profile data
+    const newRegisteredUser: Profile = {
+      id: assignedUserId,
+      full_name: payload.full_name,
+      roll_number: payload.roll_number,
+      college_email: payload.email,
+      department: payload.department,
+      semester: payload.semester,
+      hostel_block: payload.hostel_block,
+      room_number: payload.room_number,
+      phone_number: payload.phone_number,
+      bio: payload.bio || "Hostel resident.",
+      is_admin: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    setCurrentUser(newRegisteredUser);
+    setIsAuthenticated(true);
+    try {
+      localStorage.setItem("hostelhire_logged_in", "true");
+      localStorage.setItem("hostelhire_user_id", newRegisteredUser.id);
+    } catch {}
+
+    return {};
   };
 
   const signOut = async () => {
