@@ -1,0 +1,12 @@
+# Abstract and proposal files
+HostelHire_BYOT_Proposal.pdf
+HostelHire_Project_Proposal.pdf
+proposal.html
+generate_pdf.py
+assets/
+
+# Web dependencies and build cache
+web/node_modules/
+web/.next/
+web/out/
+web/.env*.local
