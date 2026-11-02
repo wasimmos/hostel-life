@@ -1,11 +1,32 @@
 -- ============================================================================
 -- HOSTELHIRE MOCK SEED DATA FOR DEMO & TESTING
--- Run this in Supabase SQL Editor AFTER running supabase_schema.sql
+-- Fixed for Supabase auth.users foreign key constraints
+-- Run this in Supabase SQL Editor
 -- ============================================================================
 
--- Mock Auth Users & Profiles (Simulating real students)
--- Note: We insert into public.profiles with deterministic UUIDs for test consistency
+-- 1. Insert mock users into auth.users first so profiles foreign key succeeds
+insert into auth.users (
+  id,
+  instance_id,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at,
+  role,
+  aud
+)
+values
+  ('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'wasim.ee@jecassam.ac.in', crypt('password123', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"full_name":"Wasim Ahmed"}', now(), now(), 'authenticated', 'authenticated'),
+  ('22222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'rhea.cse@jecassam.ac.in', crypt('password123', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"full_name":"Rhea Goswami"}', now(), now(), 'authenticated', 'authenticated'),
+  ('33333333-3333-3333-3333-333333333333', '00000000-0000-0000-0000-000000000000', 'anupam.ee@jecassam.ac.in', crypt('password123', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"full_name":"Anupam Saikia"}', now(), now(), 'authenticated', 'authenticated'),
+  ('44444444-4444-4444-4444-444444444444', '00000000-0000-0000-0000-000000000000', 'bikash.me@jecassam.ac.in', crypt('password123', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"full_name":"Bikash Kalita"}', now(), now(), 'authenticated', 'authenticated'),
+  ('55555555-5555-5555-5555-555555555555', '00000000-0000-0000-0000-000000000000', 'debojit.ce@jecassam.ac.in', crypt('password123', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"full_name":"Debojit Sharma"}', now(), now(), 'authenticated', 'authenticated')
+on conflict (id) do nothing;
 
+-- 2. Mock Student Profiles
 insert into public.profiles (id, full_name, roll_number, college_email, department, semester, hostel_block, room_number, phone_number, bio, is_admin)
 values
   ('11111111-1111-1111-1111-111111111111', 'Wasim Ahmed', '2481102401', 'wasim.ee@jecassam.ac.in', 'Electrical Engineering', 5, 'Hostel 4', 'Room 214', '+91 9876543210', 'Electronics enthusiast. Can fix laptops, format OS, and repair small electricals.', true),
@@ -15,7 +36,7 @@ values
   ('55555555-5555-5555-5555-555555555555', 'Debojit Sharma', '2481102715', 'debojit.ce@jecassam.ac.in', 'Civil Engineering', 3, 'Hostel 4', 'Room 205', '+91 9876543214', 'Junior resident, passionate about Python tutoring and lab assignments.', false)
 on conflict (id) do nothing;
 
--- 2. Mock Verifications
+-- 3. Mock Verifications
 insert into public.student_verifications (user_id, status, id_card_image_url)
 values
   ('11111111-1111-1111-1111-111111111111', 'VERIFIED', 'https://images.unsplash.com/photo-1544717305-2782549b5136'),
@@ -24,7 +45,7 @@ values
   ('44444444-4444-4444-4444-444444444444', 'VERIFIED', 'https://images.unsplash.com/photo-1544717305-2782549b5136')
 on conflict (user_id) do nothing;
 
--- 3. Realistic Service Listings (What students offer)
+-- 4. Realistic Service Listings
 insert into public.service_listings (id, provider_id, title, description, skill_category, indicative_price, turnaround_time, is_active)
 values
   ('a1111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 'Laptop Thermal Paste & Deep Dust Cleanout', 'Will open your laptop safely, clean heatsink fans, and apply Arctic MX-4 thermal paste. Brings down gaming and CAD temps by 15-20°C.', 'Electronics & Hardware', 180.00, 'Same Day (2 hrs)', true),
@@ -35,7 +56,7 @@ values
   ('a6666666-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '44444444-4444-4444-4444-444444444444', 'Shirt / Trouser Quick Stitching & Button Replacement', 'Torn shirt pocket, loose hem, or missing button before formal placement drive? Quick manual stitching fix.', 'Hostel Essentials', 40.00, '30 Minutes', true)
 on conflict (id) do nothing;
 
--- 4. Active Requests on the Request Board (Unmet needs)
+-- 5. Active Requests on the Request Board
 insert into public.service_requests (id, seeker_id, title, description, skill_category, expected_budget, urgency, is_open)
 values
   ('b1111111-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '55555555-5555-5555-5555-555555555555', 'Need urgent help fixing margins in LaTeX S5 Lab Manual', 'Due tomorrow 9 AM. I have tables overflowing the page border and figures refusing to align in center.', 'Academic Support', 100.00, 'Urgent (Tonight)', true),
@@ -43,8 +64,7 @@ values
   ('b3333333-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '33333333-3333-3333-3333-333333333333', 'Need clean presentation slides for Power Systems seminar', '12 slides PPT with clean diagrams and modern theme. Content already prepared in notepad.', 'Design & Media', 120.00, 'By Wednesday', true)
 on conflict (id) do nothing;
 
--- 5. Completed Gigs & Real Peer Reviews (For Instant Trust Demonstration)
--- Gig 1: Rhea formatted Wasim's lab report -> Completed -> Reviewed
+-- 6. Completed Gigs & Real Peer Reviews
 insert into public.gig_interests (id, source_type, service_listing_id, applicant_id, proposed_price, note, status)
 values ('c1111111-cccc-cccc-cccc-cccccccccccc', 'LISTING', 'a3333333-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-1111-1111-1111-111111111111', 80.00, 'Need my EE seminar report formatted.', 'ACCEPTED')
 on conflict (id) do nothing;
@@ -67,7 +87,6 @@ insert into public.reviews (gig_id, reviewer_id, reviewed_user_id, rating, comme
 values ('d1111111-dddd-dddd-dddd-dddddddddddd', '11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', 5, 'Super fast turnaround! The LaTeX report compiled with zero errors and professors praised the formatting.')
 on conflict (gig_id, reviewer_id) do nothing;
 
--- Gig 2: Wasim cleaned Bikash's laptop -> Completed -> Reviewed
 insert into public.gig_interests (id, source_type, service_listing_id, applicant_id, proposed_price, note, status)
 values ('c2222222-cccc-cccc-cccc-cccccccccccc', 'LISTING', 'a1111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '44444444-4444-4444-4444-444444444444', 180.00, 'My Legion laptop is overheating on Valorant.', 'ACCEPTED')
 on conflict (id) do nothing;
