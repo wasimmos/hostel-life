@@ -9,8 +9,8 @@ interface LoginScreenProps {
 }
 
 export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
-  const { signIn, signUp, switchUser, setDirectLogin } = useAuth();
-  const [tab, setTab] = useState<"quick" | "signin" | "signup">("quick");
+  const { signIn, signUp, setDirectLogin } = useAuth();
+  const [tab, setTab] = useState<"signin" | "signup">("signin");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -28,12 +28,6 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const [hostelBlock, setHostelBlock] = useState("Hostel 4");
   const [roomNumber, setRoomNumber] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
-
-  const handleQuickLogin = (userId: string) => {
-    switchUser(userId);
-    setDirectLogin(true);
-    if (onLoginSuccess) onLoginSuccess();
-  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,18 +103,6 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           <button
             type="button"
             onClick={() => {
-              setTab("quick");
-              setErrorMessage("");
-            }}
-            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
-              tab === "quick" ? "bg-white text-[#1E40AF] shadow-xs" : "text-[#64748B]"
-            }`}
-          >
-            Quick Demo Login
-          </button>
-          <button
-            type="button"
-            onClick={() => {
               setTab("signin");
               setErrorMessage("");
             }}
@@ -140,7 +122,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               tab === "signup" ? "bg-white text-[#1E40AF] shadow-xs" : "text-[#64748B]"
             }`}
           >
-            Register
+            New Student Registration
           </button>
         </div>
 
@@ -152,53 +134,51 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           </div>
         )}
 
-        {/* 1. Quick 1-Click Persona Login */}
-        {tab === "quick" && (
-          <div className="flex flex-col gap-2.5">
-            <span className="text-[11px] font-bold text-[#64748B] uppercase tracking-wider text-center">
-              Select Student Persona to Enter:
-            </span>
-
-            {DEMO_PROFILES.map((profile) => (
-              <button
-                key={profile.id}
-                type="button"
-                onClick={() => handleQuickLogin(profile.id)}
-                className="p-3 bg-[#F8FAFC] hover:bg-[#eaedff] border border-[#E2E8F0] hover:border-[#BFDBFE] rounded-xl text-left transition-all flex items-center justify-between group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-[#1E40AF] text-white font-bold text-xs flex items-center justify-center shrink-0">
-                    {profile.full_name.charAt(0)}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-[#0F172A] group-hover:text-[#1E40AF]">
-                        {profile.full_name}
-                      </span>
-                      {profile.is_admin && (
-                        <span className="text-[9px] px-1.5 py-0.2 bg-[#FFFBEB] text-[#D97706] border border-[#FDE68A] rounded font-bold">
-                          Admin
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-[#64748B] mt-0.5">
-                      {profile.hostel_block} • {profile.department} (Sem {profile.semester})
-                    </p>
-                  </div>
-                </div>
-                <ArrowRight className="w-4 h-4 text-[#94A3B8] group-hover:text-[#1E40AF] group-hover:translate-x-0.5 transition-all" />
-              </button>
-            ))}
-
-            <p className="text-[11px] text-center text-[#94A3B8] pt-1">
-              Select any profile to enter the campus marketplace instantly.
-            </p>
-          </div>
-        )}
-
-        {/* 2. Email Sign In Form */}
+        {/* 1. Sign In Form */}
         {tab === "signin" && (
           <form onSubmit={handleSignIn} className="flex flex-col gap-3">
+            {/* Login Credentials Box */}
+            <div className="p-3 bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-[#166534] uppercase tracking-wider flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Campus Login Credentials
+                </span>
+                <span className="text-[10px] text-[#15803D] font-medium">Tap to Autofill</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div
+                  onClick={() => {
+                    setSignInEmail("wasim.ee@jecassam.ac.in");
+                    setSignInPassword("admin@jec123");
+                  }}
+                  className="p-2 bg-white rounded-lg border border-[#86EFAC] cursor-pointer hover:bg-[#DCFCE7] transition-all"
+                >
+                  <div className="font-bold text-[#15803D] flex items-center justify-between">
+                    <span>Wasim (Admin)</span>
+                    <span className="text-[9px] px-1 bg-[#FEF3C7] text-[#92400E] rounded font-bold">Admin</span>
+                  </div>
+                  <div className="text-[10px] text-[#475569] mt-0.5 truncate">wasim.ee@jecassam.ac.in</div>
+                  <div className="text-[10px] font-mono text-[#166534] mt-0.5 font-bold">admin@jec123</div>
+                </div>
+
+                <div
+                  onClick={() => {
+                    setSignInEmail("rhea.cse@jecassam.ac.in");
+                    setSignInPassword("rhea@jec123");
+                  }}
+                  className="p-2 bg-white rounded-lg border border-[#86EFAC] cursor-pointer hover:bg-[#DCFCE7] transition-all"
+                >
+                  <div className="font-bold text-[#15803D] flex items-center justify-between">
+                    <span>Rhea (GH 2)</span>
+                    <span className="text-[9px] px-1 bg-[#F3E8FF] text-[#7E22CE] rounded font-bold">Female</span>
+                  </div>
+                  <div className="text-[10px] text-[#475569] mt-0.5 truncate">rhea.cse@jecassam.ac.in</div>
+                  <div className="text-[10px] font-mono text-[#166534] mt-0.5 font-bold">rhea@jec123</div>
+                </div>
+              </div>
+            </div>
+
             <div>
               <label className="text-[11px] font-bold text-[#475569] block mb-1">
                 College Email ID

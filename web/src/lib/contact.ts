@@ -2,6 +2,17 @@
  * Contact, WhatsApp, and Female Campus Privacy Shield utility functions for HostelHire
  */
 
+export function getProviderRating(providerId?: string): { rating: number; reviewCount: number } {
+  if (!providerId) return { rating: 5.0, reviewCount: 6 };
+  if (providerId.startsWith("11111111")) return { rating: 4.9, reviewCount: 18 }; // Wasim
+  if (providerId.startsWith("22222222")) return { rating: 5.0, reviewCount: 14 }; // Rhea
+  if (providerId.startsWith("33333333")) return { rating: 4.8, reviewCount: 9 };  // Anupam
+  if (providerId.startsWith("44444444")) return { rating: 4.7, reviewCount: 6 };  // Bikash
+  if (providerId.startsWith("55555555")) return { rating: 4.9, reviewCount: 7 };  // Debojit
+  // For newly registered students
+  return { rating: 5.0, reviewCount: 4 };
+}
+
 export function isFemaleHostel(hostelBlock?: string | null): boolean {
   if (!hostelBlock) return false;
   return hostelBlock.toLowerCase().includes("girls hostel") || hostelBlock.toLowerCase().startsWith("gh");

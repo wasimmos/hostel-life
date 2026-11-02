@@ -14,6 +14,7 @@ import { AdminPanel } from "@/components/AdminPanel";
 import { LoginScreen } from "@/components/LoginScreen";
 import { NotificationsModal, NotificationItem } from "@/components/NotificationsModal";
 import { useAuth } from "@/context/AuthContext";
+import { isFemaleHostel } from "@/lib/contact";
 import {
   fetchListings,
   fetchRequests,
@@ -279,17 +280,28 @@ export default function Home() {
     },
   ]);
 
-  // Load from Supabase if configured
-  useEffect(() => {
-    async function loadData() {
+  // Load from Supabase with continuous live polling for cross-device sync
+  const loadData = async () => {
+    try {
       const liveListings = await fetchListings();
-      if (liveListings.length > 0) setListings(liveListings);
-
+      if (liveListings && liveListings.length > 0) {
+        setListings(liveListings);
+      }
       const liveRequests = await fetchRequests();
-      if (liveRequests.length > 0) setRequests(liveRequests);
+      if (liveRequests && liveRequests.length > 0) {
+        setRequests(liveRequests);
+      }
+    } catch (err) {
+      console.error("Data sync error:", err);
     }
+  };
+
+  useEffect(() => {
     loadData();
-  }, []);
+    // 5-second polling interval so listings posted on one mobile appear on another immediately
+    const pollInterval = setInterval(loadData, 5000);
+    return () => clearInterval(pollInterval);
+  }, [isAuthenticated]);
 
   // Mock Reviews
   const mockReviews: (Review & { reviewer: any })[] = [
@@ -345,18 +357,19 @@ export default function Home() {
 
     try {
       await createServiceListing(payload);
+      await loadData();
     } catch {
       // Local optimistic fallback
+      const localItem = {
+        id: `a-${Date.now()}`,
+        ...payload,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        provider: user,
+      };
+      setListings((prev) => [localItem, ...prev]);
     }
 
-    const localItem = {
-      id: `a-${Date.now()}`,
-      ...payload,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      provider: user,
-    };
-    setListings([localItem, ...listings]);
     setActiveTab("explore");
   };
 
@@ -373,18 +386,19 @@ export default function Home() {
 
     try {
       await createServiceRequest(payload);
+      await loadData();
     } catch {
       // Local optimistic fallback
+      const localItem = {
+        id: `b-${Date.now()}`,
+        ...payload,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        seeker: user,
+      };
+      setRequests((prev) => [localItem, ...prev]);
     }
 
-    const localItem = {
-      id: `b-${Date.now()}`,
-      ...payload,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      seeker: user,
-    };
-    setRequests([localItem, ...requests]);
     setActiveTab("explore");
   };
 
@@ -401,6 +415,46 @@ export default function Home() {
     if (selectedGig && selectedGig.id === gigId) {
       setSelectedGig({ ...selectedGig, status: "COMPLETED" });
     }
+  };
+
+  const handleAcceptServiceRequest = (gigId: string) => {
+    setGigs((prev) =>
+      prev.map((g) => (g.id === gigId ? { ...g, status: "ACCEPTED" as const } : g))
+    );
+    if (selectedGig && selectedGig.id === gigId) {
+      setSelectedGig((prev) => (prev ? { ...prev, status: "ACCEPTED" } : null));
+    }
+    setNotifications((prev) => [
+      {
+        id: `notif-${Date.now()}`,
+        title: "Request Approved! ⚡",
+        message: "Service request accepted. Campus phone & WhatsApp coordination unlocked.",
+        time: "Just now",
+        read: false,
+        type: "gig",
+      },
+      ...prev,
+    ]);
+  };
+
+  const handleRejectServiceRequest = (gigId: string) => {
+    setGigs((prev) =>
+      prev.map((g) => (g.id === gigId ? { ...g, status: "CANCELLED" as const } : g))
+    );
+    if (selectedGig && selectedGig.id === gigId) {
+      setSelectedGig((prev) => (prev ? { ...prev, status: "CANCELLED" } : null));
+    }
+    setNotifications((prev) => [
+      {
+        id: `notif-${Date.now()}`,
+        title: "Request Declined",
+        message: "Service request was declined.",
+        time: "Just now",
+        read: false,
+        type: "gig",
+      },
+      ...prev,
+    ]);
   };
 
   if (!isAuthenticated) {
@@ -437,17 +491,25 @@ export default function Home() {
             onBack={() => setSelectedGig(null)}
             onConfirmCompletion={handleConfirmGigCompletion}
             onConsentContact={() => {}}
+            onAcceptRequest={handleAcceptServiceRequest}
+            onRejectRequest={handleRejectServiceRequest}
           />
         ) : activeTab === "explore" ? (
           <DiscoveryFeed
             listings={listings}
             requests={requests}
             currentUser={user}
+            onRefresh={loadData}
             onSelectListing={(listing) => {
               const existing = gigs.find((g) => g.source_id === listing.id);
               if (existing) {
                 setSelectedGig(existing);
               } else {
+                const providerBlock = (listing as any).provider?.hostel_block;
+                const isProviderFemale = isFemaleHostel(providerBlock);
+                const isSeekerMale = !isFemaleHostel(user.hostel_block);
+                const requiresModeration = isProviderFemale && isSeekerMale;
+
                 const newGig: Gig & { seeker: any; provider: any } = {
                   id: `gig-${Date.now().toString().slice(-4)}`,
                   source_type: "LISTING",
@@ -456,13 +518,27 @@ export default function Home() {
                   provider_id: listing.provider_id,
                   accepted_interest_id: `int-${Date.now()}`,
                   agreed_price: listing.indicative_price,
-                  status: "ACCEPTED",
+                  status: requiresModeration ? "INTERESTED" : "ACCEPTED",
                   created_at: new Date().toISOString(),
                   seeker: user,
                   provider: (listing as any).provider,
                 };
                 setGigs([newGig, ...gigs]);
                 setSelectedGig(newGig);
+
+                if (requiresModeration) {
+                  setNotifications((prev) => [
+                    {
+                      id: `notif-${Date.now()}`,
+                      title: "Service Request Sent 💬",
+                      message: `Your request for '${listing.title}' was sent to ${(listing as any).provider?.full_name || "provider"}. Awaiting approval.`,
+                      time: "Just now",
+                      read: false,
+                      type: "gig",
+                    },
+                    ...prev,
+                  ]);
+                }
               }
             }}
             onSelectRequest={(request) => {
@@ -501,6 +577,7 @@ export default function Home() {
         onClose={() => setIsPostModalOpen(false)}
         onSubmitListing={handleAddListing}
         onSubmitRequest={handleAddRequest}
+        currentUser={user}
       />
 
       <AuthModal />

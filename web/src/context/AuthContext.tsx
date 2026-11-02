@@ -194,14 +194,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    // 1. Check demo profiles first
-    const demoMatch = DEMO_PROFILES.find((p) => p.college_email.toLowerCase() === email.toLowerCase());
-    if (demoMatch) {
-      setCurrentUser(demoMatch);
+    const cleanEmail = email.toLowerCase().trim();
+
+    // 1. Check designated reviewer & admin accounts
+    if (cleanEmail === "wasim.ee@jecassam.ac.in") {
+      if (password !== "admin@jec123") {
+        return { error: "Invalid password for Wasim Ahmed. Use: admin@jec123" };
+      }
+      setCurrentUser(DEMO_PROFILES[0]);
       setIsAuthenticated(true);
       try {
         localStorage.setItem("hostelhire_logged_in", "true");
-        localStorage.setItem("hostelhire_user_id", demoMatch.id);
+        localStorage.setItem("hostelhire_user_id", DEMO_PROFILES[0].id);
+      } catch {}
+      return {};
+    }
+
+    if (cleanEmail === "rhea.cse@jecassam.ac.in") {
+      if (password !== "rhea@jec123") {
+        return { error: "Invalid password for Rhea Goswami. Use: rhea@jec123" };
+      }
+      setCurrentUser(DEMO_PROFILES[1]);
+      setIsAuthenticated(true);
+      try {
+        localStorage.setItem("hostelhire_logged_in", "true");
+        localStorage.setItem("hostelhire_user_id", DEMO_PROFILES[1].id);
       } catch {}
       return {};
     }
@@ -211,7 +228,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: profile } = await supabase
         .from("profiles")
         .select("*")
-        .eq("college_email", email)
+        .ilike("college_email", cleanEmail)
         .maybeSingle();
 
       if (profile) {
@@ -229,7 +246,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // 3. Fallback to Supabase Auth password check if available
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
       if (data?.user) {
         const { data: profile } = await supabase
           .from("profiles")
@@ -244,7 +261,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) return { error: error.message };
       return {};
     } catch (err: any) {
-      return { error: err.message || "Failed to sign in" };
+      return { error: err.message || "Failed to sign in. Please verify your credentials." };
     }
   };
 

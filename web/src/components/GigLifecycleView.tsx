@@ -25,6 +25,8 @@ interface GigLifecycleViewProps {
   onBack: () => void;
   onConfirmCompletion: (gigId: string) => void;
   onConsentContact: (gigId: string) => void;
+  onAcceptRequest?: (gigId: string) => void;
+  onRejectRequest?: (gigId: string) => void;
   currentUser?: Profile;
 }
 
@@ -34,6 +36,8 @@ export function GigLifecycleView({
   onBack,
   onConfirmCompletion,
   onConsentContact,
+  onAcceptRequest,
+  onRejectRequest,
   currentUser,
 }: GigLifecycleViewProps) {
   const [contactShared, setContactShared] = useState(true); // Demo default unlocked or toggleable
@@ -104,6 +108,61 @@ export function GigLifecycleView({
           <span>With: <strong>{otherParty?.full_name || "Peer Student"}</strong></span>
         </div>
       </div>
+
+      {/* Girl-to-Boy Request Moderation & Decision Card */}
+      {gig.status === "INTERESTED" && isFemaleHostel(gig.provider?.hostel_block) && (
+        currentUserRole === "provider" ? (
+          <div className="p-4 bg-[#FAF5FF] border border-[#E9D5FF] rounded-xl flex flex-col gap-3 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-[#6B21A8] flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-[#9333EA]" />
+                Incoming Service Request
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#F3E8FF] text-[#7E22CE] font-bold">Action Required</span>
+            </div>
+            <p className="text-xs text-[#7E22CE]/90 leading-relaxed">
+              <strong>{gig.seeker?.full_name}</strong> from <strong>{gig.seeker?.hostel_block}</strong> has requested your service. In accordance with campus policy, meeting takes place at a Campus Common Hub.
+            </p>
+            <div className="p-2.5 bg-white rounded-lg border border-[#E9D5FF] flex flex-col gap-1 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[#64748B]">Requester:</span>
+                <strong className="text-[#0F172A]">{gig.seeker?.full_name} ({gig.seeker?.department})</strong>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[#64748B]">Proposed Amount:</span>
+                <strong className="text-[#059669]">₹{gig.agreed_price}</strong>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => onAcceptRequest && onAcceptRequest(gig.id)}
+                className="py-2.5 px-3 bg-[#059669] hover:bg-[#047857] text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Accept Request</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onRejectRequest && onRejectRequest(gig.id)}
+                className="py-2.5 px-3 bg-white hover:bg-[#FEF2F2] border border-[#FCA5A5] text-[#DC2626] rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <span>Decline / Reject</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="p-4 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-[#D97706]" />
+              <span className="text-xs font-bold text-[#92400E]">Service Request Sent • Awaiting Approval</span>
+            </div>
+            <p className="text-[11px] text-[#B45309] leading-relaxed">
+              You requested this service from <strong>{gig.provider?.full_name}</strong>. Per Girls Hostel campus safety regulations, contact and handover details remain locked until she reviews and accepts your request.
+            </p>
+          </div>
+        )
+      )}
 
       {/* Visual Stepper */}
       <div className="hh-card p-4">

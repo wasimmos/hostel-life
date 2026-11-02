@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, ShieldCheck, Clock, Zap, ArrowRight, MessageSquarePlus, MessageCircle, Lock } from "lucide-react";
+import { Search, ShieldCheck, Clock, Zap, ArrowRight, MessageSquarePlus, MessageCircle, Lock, RotateCw, Star } from "lucide-react";
 import { ServiceListing, ServiceRequest, Profile } from "@/types/database.types";
-import { getWhatsAppUrl, isFemaleHostel, canAccessDirectContact, maskPhoneNumber } from "@/lib/contact";
+import { getWhatsAppUrl, isFemaleHostel, canAccessDirectContact, maskPhoneNumber, getProviderRating } from "@/lib/contact";
 
 interface DiscoveryFeedProps {
   listings: (ServiceListing & { provider: any })[];
@@ -11,6 +11,7 @@ interface DiscoveryFeedProps {
   onSelectListing: (listing: ServiceListing) => void;
   onSelectRequest: (request: ServiceRequest) => void;
   currentUser?: Profile;
+  onRefresh?: () => void;
 }
 
 export function DiscoveryFeed({
@@ -19,6 +20,7 @@ export function DiscoveryFeed({
   onSelectListing,
   onSelectRequest,
   currentUser,
+  onRefresh,
 }: DiscoveryFeedProps) {
   const [mode, setMode] = useState<"services" | "requests">("services");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
@@ -54,28 +56,41 @@ export function DiscoveryFeed({
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      {/* 1. Dual-Mode Segmented Switcher */}
-      <div className="bg-[#eaedff] p-1 rounded-xl flex items-center border border-[#dae2fd]">
-        <button
-          onClick={() => setMode("services")}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-            mode === "services"
-              ? "bg-[#1E40AF] text-white"
-              : "text-[#444653] hover:text-[#0F172A]"
-          }`}
-        >
-          Services Offered ({listings.length})
-        </button>
-        <button
-          onClick={() => setMode("requests")}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-            mode === "requests"
-              ? "bg-[#1E40AF] text-white"
-              : "text-[#444653] hover:text-[#0F172A]"
-          }`}
-        >
-          Requests Needed ({requests.length})
-        </button>
+      {/* 1. Dual-Mode Segmented Switcher & Real-time Refresh */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1 bg-[#eaedff] p-1 rounded-xl flex items-center border border-[#dae2fd]">
+          <button
+            onClick={() => setMode("services")}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+              mode === "services"
+                ? "bg-[#1E40AF] text-white"
+                : "text-[#444653] hover:text-[#0F172A]"
+            }`}
+          >
+            Services Offered ({listings.length})
+          </button>
+          <button
+            onClick={() => setMode("requests")}
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+              mode === "requests"
+                ? "bg-[#1E40AF] text-white"
+                : "text-[#444653] hover:text-[#0F172A]"
+            }`}
+          >
+            Requests Needed ({requests.length})
+          </button>
+        </div>
+
+        {onRefresh && (
+          <button
+            onClick={onRefresh}
+            className="w-9 h-9 rounded-xl bg-white border border-[#E2E8F0] hover:bg-[#F1F5F9] text-[#64748B] hover:text-[#1E40AF] flex items-center justify-center shrink-0 transition-colors shadow-xs"
+            title="Refresh Live Campus Listings"
+            aria-label="Refresh Feed"
+          >
+            <RotateCw className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* 2. Search & Category Chips */}
@@ -134,11 +149,17 @@ export function DiscoveryFeed({
                       {listing.provider?.full_name?.charAt(0) || "P"}
                     </div>
                     <div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-xs font-bold text-[#0F172A]">
                           {listing.provider?.full_name}
                         </span>
                         <ShieldCheck className="w-3.5 h-3.5 text-[#059669]" />
+                        {/* Rating Beside Name */}
+                        <div className="inline-flex items-center gap-0.5 px-1.5 py-0.2 bg-[#FFFBEB] border border-[#FDE68A] text-[#D97706] rounded text-[10px] font-bold">
+                          <span>★</span>
+                          <span>{getProviderRating(listing.provider?.id).rating.toFixed(1)}</span>
+                          <span className="text-[#92400E]/70 font-normal">({getProviderRating(listing.provider?.id).reviewCount})</span>
+                        </div>
                         {isFemaleHostel(listing.provider?.hostel_block) && (
                           <span className="text-[9px] px-1.5 py-0.2 bg-[#F3E8FF] text-[#7E22CE] border border-[#E9D5FF] rounded font-bold">
                             GH Protected

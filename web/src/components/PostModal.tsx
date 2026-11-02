@@ -2,12 +2,15 @@
 
 import React, { useState } from "react";
 import { X, Check } from "lucide-react";
+import { Profile } from "@/types/database.types";
+import { isFemaleHostel } from "@/lib/contact";
 
 interface PostModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmitListing: (data: any) => void;
   onSubmitRequest: (data: any) => void;
+  currentUser?: Profile;
 }
 
 export function PostModal({
@@ -15,7 +18,9 @@ export function PostModal({
   onClose,
   onSubmitListing,
   onSubmitRequest,
+  currentUser,
 }: PostModalProps) {
+  const isUserFemale = isFemaleHostel(currentUser?.hostel_block);
   const [postType, setPostType] = useState<"service" | "request">("service");
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Electronics & Hardware");
@@ -37,7 +42,7 @@ export function PostModal({
         indicative_price: parseFloat(price),
         turnaround_time: timeframe || "Within 24 Hours",
         description,
-        girls_hostel_only: girlsHostelOnly,
+        girls_hostel_only: isUserFemale ? girlsHostelOnly : false,
       });
     } else {
       onSubmitRequest({
@@ -46,7 +51,7 @@ export function PostModal({
         expected_budget: parseFloat(price),
         urgency: timeframe || "Needed Tonight",
         description,
-        girls_hostel_only: girlsHostelOnly,
+        girls_hostel_only: isUserFemale ? girlsHostelOnly : false,
       });
     }
 
@@ -173,25 +178,27 @@ export function PostModal({
             />
           </div>
 
-          {/* Girls Hostel Only Toggle */}
-          <div className="p-3 bg-[#FAF5FF] border border-[#E9D5FF] rounded-xl flex items-start gap-2.5">
-            <input
-              type="checkbox"
-              id="gh-only"
-              checked={girlsHostelOnly}
-              onChange={(e) => setGirlsHostelOnly(e.target.checked)}
-              className="mt-0.5 rounded text-[#9333EA] focus:ring-[#9333EA]"
-            />
-            <label htmlFor="gh-only" className="cursor-pointer">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-[#6B21A8]">Girls Hostel (GH) Only</span>
-                <span className="text-[9px] px-1.5 py-0.2 bg-[#F3E8FF] text-[#7E22CE] rounded-full font-bold">Privacy Shield</span>
-              </div>
-              <p className="text-[11px] text-[#7E22CE]/80 leading-snug mt-0.5">
-                Restrict this post and room visits exclusively to verified female hostel peers.
-              </p>
-            </label>
-          </div>
+          {/* Girls Hostel Only Toggle (Strictly female resident only) */}
+          {isUserFemale && (
+            <div className="p-3 bg-[#FAF5FF] border border-[#E9D5FF] rounded-xl flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                id="gh-only"
+                checked={girlsHostelOnly}
+                onChange={(e) => setGirlsHostelOnly(e.target.checked)}
+                className="mt-0.5 rounded text-[#9333EA] focus:ring-[#9333EA]"
+              />
+              <label htmlFor="gh-only" className="cursor-pointer">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-[#6B21A8]">Girls Hostel (GH) Only</span>
+                  <span className="text-[9px] px-1.5 py-0.2 bg-[#F3E8FF] text-[#7E22CE] rounded-full font-bold">Privacy Shield</span>
+                </div>
+                <p className="text-[11px] text-[#7E22CE]/80 leading-snug mt-0.5">
+                  Restrict this post and room visits exclusively to verified female hostel peers.
+                </p>
+              </label>
+            </div>
+          )}
 
           <button
             type="submit"

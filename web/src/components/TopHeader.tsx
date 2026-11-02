@@ -1,8 +1,7 @@
 "use client";
 
 import React from "react";
-import { Bell, LogIn, LogOut } from "lucide-react";
-import { RoleSwitcher } from "./RoleSwitcher";
+import { Bell, LogOut, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 interface TopHeaderProps {
@@ -41,7 +40,19 @@ export function TopHeader({
       </div>
 
       <div className="flex items-center gap-1.5">
-        <RoleSwitcher />
+        <div className="flex items-center gap-1.5 px-2 py-1 bg-white border border-[#E2E8F0] rounded-lg">
+          <div className="w-5 h-5 rounded-full bg-[#1E40AF] text-white flex items-center justify-center text-[10px] font-bold">
+            {user.full_name?.charAt(0) || "U"}
+          </div>
+          <div className="flex flex-col text-left">
+            <span className="text-[11px] font-bold text-[#0F172A] leading-none max-w-[95px] truncate">
+              {user.full_name?.split(" ")[0]}
+            </span>
+            <span className="text-[9px] text-[#64748B] leading-none mt-0.5 max-w-[95px] truncate">
+              {user.hostel_block}
+            </span>
+          </div>
+        </div>
 
         {isAdmin && (
           <button
