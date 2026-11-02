@@ -242,3 +242,129 @@ export async function confirmGigCompletionRPC(gigId: string) {
   if (error) throw error;
   return data; // returns 'PENDING_OTHER_PARTY' or 'COMPLETED'
 }
+
+// ==========================================
+// 4. CROSS-DEVICE SERVICE MODERATION & APPROVAL SYNC
+// ==========================================
+
+export async function recordServiceRequest(req: {
+  gigId: string;
+  listingId?: string;
+  seekerId: string;
+  seekerName: string;
+  seekerHostel: string;
+  seekerDepartment?: string;
+  seekerPhone?: string;
+  providerId: string;
+  providerName: string;
+  providerHostel: string;
+  providerPhone?: string;
+  note?: string;
+  agreedPrice: number;
+  listingTitle?: string;
+}) {
+  if (!isSupabaseConfigured()) return null;
+
+  const payload = {
+    seeker_id: req.seekerId,
+    title: `[SERVICE_REQUEST:${req.gigId}]`,
+    description: JSON.stringify({
+      gigId: req.gigId,
+      listingId: req.listingId,
+      seekerId: req.seekerId,
+      seekerName: req.seekerName,
+      seekerHostel: req.seekerHostel,
+      seekerDepartment: req.seekerDepartment,
+      seekerPhone: req.seekerPhone,
+      providerId: req.providerId,
+      providerName: req.providerName,
+      providerHostel: req.providerHostel,
+      providerPhone: req.providerPhone,
+      note: req.note,
+      agreedPrice: req.agreedPrice,
+      listingTitle: req.listingTitle,
+      status: "INTERESTED",
+      timestamp: new Date().toISOString(),
+    }),
+    skill_category: "Academic Support",
+    expected_budget: req.agreedPrice || 80,
+    urgency: "Approval Required",
+    is_open: true,
+  };
+
+  const { data, error } = await supabase
+    .from("service_requests")
+    .insert(payload)
+    .select()
+    .single();
+
+  if (error) console.error("Error recording service request:", error);
+  return data;
+}
+
+export async function recordServiceDecision(
+  gigId: string,
+  decision: "ACCEPTED" | "CANCELLED",
+  providerId: string,
+  seekerId: string,
+  unlockedPhone?: string
+) {
+  if (!isSupabaseConfigured()) return null;
+
+  const payload = {
+    seeker_id: providerId,
+    title: `[SERVICE_DECISION:${gigId}]`,
+    description: JSON.stringify({
+      gigId,
+      decision,
+      providerId,
+      seekerId,
+      unlockedPhone,
+      timestamp: new Date().toISOString(),
+    }),
+    skill_category: "Academic Support",
+    expected_budget: 80,
+    urgency: decision === "ACCEPTED" ? "Approved" : "Declined",
+    is_open: true,
+  };
+
+  const { data, error } = await supabase
+    .from("service_requests")
+    .insert(payload)
+    .select()
+    .single();
+
+  if (error) console.error("Error recording service decision:", error);
+  return data;
+}
+
+export async function fetchServiceModerations(): Promise<{
+  requests: any[];
+  decisions: any[];
+}> {
+  if (!isSupabaseConfigured()) return { requests: [], decisions: [] };
+
+  const { data, error } = await supabase
+    .from("service_requests")
+    .select("*")
+    .or("title.ilike.%[SERVICE_REQUEST:%,title.ilike.%[SERVICE_DECISION:%")
+    .order("created_at", { ascending: false });
+
+  if (error || !data) return { requests: [], decisions: [] };
+
+  const requests: any[] = [];
+  const decisions: any[] = [];
+
+  for (const item of data) {
+    try {
+      const parsed = JSON.parse(item.description);
+      if (item.title.startsWith("[SERVICE_REQUEST:")) {
+        requests.push(parsed);
+      } else if (item.title.startsWith("[SERVICE_DECISION:")) {
+        decisions.push(parsed);
+      }
+    } catch {}
+  }
+
+  return { requests, decisions };
+}

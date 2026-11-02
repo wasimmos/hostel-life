@@ -50,11 +50,15 @@ export function GigLifecycleView({
     gig.status === "COMPLETED" || gig.status === "COMPLETION_PENDING"
   );
 
+  const isApproved =
+    gig.status === "ACCEPTED" ||
+    gig.status === "COMPLETED" ||
+    femaleConsentApproved;
+
   const isCrossGenderLocked =
     isFemaleHostel(gig.provider?.hostel_block) &&
     !isFemaleHostel(currentUser?.hostel_block) &&
-    gig.status !== "ACCEPTED" &&
-    gig.status !== "COMPLETED";
+    !isApproved;
 
   const contactShared = !isCrossGenderLocked || manualContactShared;
   const setContactShared = (shared: boolean) => setManualContactShared(shared);
@@ -335,23 +339,32 @@ export function GigLifecycleView({
               </strong>
             </div>
 
+            {isApproved && isFemaleHostel(otherParty?.hostel_block) && !isFemaleHostel(currentUser?.hostel_block) && (
+              <div className="p-2.5 bg-[#ECFDF5] border border-[#A7F3D0] rounded-lg flex items-center gap-2 text-xs text-[#059669]">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-[#059669]" />
+                <span className="font-semibold text-[11px]">
+                  Approval Granted by {otherParty?.full_name} • Phone & WhatsApp Unlocked. Handover at Campus Common Hub.
+                </span>
+              </div>
+            )}
+
             <div className="flex items-center justify-between text-xs">
               <span className="text-[#64748B]">Phone Number:</span>
               <div className="flex items-center gap-1.5">
                 <strong className="text-[#0F172A]">
                   {isFemaleHostel(otherParty?.hostel_block) &&
                   !isFemaleHostel(currentUser?.hostel_block) &&
-                  !femaleConsentApproved
+                  !isApproved
                     ? maskPhoneNumber(otherParty?.phone_number)
-                    : otherParty?.phone_number || "+91 9876543210"}
+                    : otherParty?.phone_number || "+91 9876543211"}
                 </strong>
                 {(!isFemaleHostel(otherParty?.hostel_block) ||
                   isFemaleHostel(currentUser?.hostel_block) ||
-                  femaleConsentApproved) && (
+                  isApproved) && (
                   <button
                     type="button"
                     onClick={() => {
-                      navigator.clipboard.writeText(otherParty?.phone_number || "+919876543210");
+                      navigator.clipboard.writeText(otherParty?.phone_number || "+919876543211");
                       setCopied(true);
                       setTimeout(() => setCopied(false), 2000);
                     }}
@@ -367,14 +380,17 @@ export function GigLifecycleView({
             {/* Female Student Explicit Approval Action */}
             {isFemaleHostel(currentUser?.hostel_block) &&
               !isFemaleHostel(otherParty?.hostel_block) &&
-              !femaleConsentApproved && (
+              !isApproved && (
                 <div className="pt-2 border-t border-[#E2E8F0] flex flex-col gap-1.5">
                   <span className="text-[11px] text-[#64748B]">
                     Do you want to share your WhatsApp and phone number with {otherParty?.full_name}?
                   </span>
                   <button
                     type="button"
-                    onClick={() => setFemaleConsentApproved(true)}
+                    onClick={() => {
+                      setFemaleConsentApproved(true);
+                      if (onAcceptRequest) onAcceptRequest(gig.id);
+                    }}
                     className="hh-btn-primary py-2 text-xs font-bold bg-[#9333EA] hover:bg-[#7E22CE] border-none flex items-center justify-center gap-1.5"
                   >
                     <Unlock className="w-3.5 h-3.5" />
@@ -387,7 +403,7 @@ export function GigLifecycleView({
             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#E2E8F0]">
               {isFemaleHostel(otherParty?.hostel_block) &&
               !isFemaleHostel(currentUser?.hostel_block) &&
-              !femaleConsentApproved ? (
+              !isApproved ? (
                 <div className="col-span-2 py-2 px-3 bg-[#F1F5F9] border border-[#CBD5E1] rounded-lg text-center text-xs text-[#64748B] font-medium flex items-center justify-center gap-1.5">
                   <Lock className="w-3.5 h-3.5 text-[#94A3B8]" />
                   <span>Awaiting Female Student Approval to Reveal Contact</span>
@@ -396,7 +412,7 @@ export function GigLifecycleView({
                 <>
                   <a
                     href={getWhatsAppUrl(
-                      otherParty?.phone_number,
+                      otherParty?.phone_number || "+919876543211",
                       `Hi ${otherParty?.full_name || "peer"}, I am coordinating with you for our HostelHire gig (Agreed: ₹${gig.agreed_price}). Are you free to coordinate?`
                     )}
                     target="_blank"
@@ -407,7 +423,7 @@ export function GigLifecycleView({
                     <span>WhatsApp</span>
                   </a>
                   <a
-                    href={getTelUrl(otherParty?.phone_number)}
+                    href={getTelUrl(otherParty?.phone_number || "+919876543211")}
                     className="hh-btn-secondary py-2 text-xs flex items-center justify-center gap-1.5 font-bold hover:bg-[#F1F5F9]"
                   >
                     <Phone className="w-3.5 h-3.5 text-[#475569]" />

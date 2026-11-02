@@ -22,6 +22,9 @@ import {
   createServiceRequest,
   acceptGigInterestRPC,
   confirmGigCompletionRPC,
+  recordServiceRequest,
+  recordServiceDecision,
+  fetchServiceModerations,
 } from "@/lib/api";
 import { ServiceListing, ServiceRequest, Gig, Review } from "@/types/database.types";
 
@@ -287,9 +290,127 @@ export default function Home() {
       if (liveListings && liveListings.length > 0) {
         setListings(liveListings);
       }
+
       const liveRequests = await fetchRequests();
       if (liveRequests && liveRequests.length > 0) {
-        setRequests(liveRequests);
+        // Filter out internal sync records from the public student request board
+        const publicRequests = liveRequests.filter(
+          (r) =>
+            !r.title.startsWith("[SERVICE_REQUEST:") &&
+            !r.title.startsWith("[SERVICE_DECISION:") &&
+            !r.title.startsWith("[MODERATION_REQ]") &&
+            !r.title.startsWith("[Service Request]")
+        );
+        setRequests(publicRequests);
+      }
+
+      // Live cross-device synchronization of requests and approvals
+      const { requests: syncdRequests, decisions: syncdDecisions } = await fetchServiceModerations();
+
+      // 1. If any decisions (approvals/rejections) are recorded in Supabase, update matching gigs
+      if (syncdDecisions.length > 0) {
+        setGigs((prevGigs) => {
+          let hasChange = false;
+          const updated = prevGigs.map((g) => {
+            const dec = syncdDecisions.find((d) => d.gigId === g.id);
+            if (dec && g.status !== dec.decision) {
+              hasChange = true;
+              return {
+                ...g,
+                status: dec.decision as any,
+                provider: {
+                  ...g.provider,
+                  phone_number: dec.unlockedPhone || g.provider?.phone_number || "+91 9876543211",
+                },
+              };
+            }
+            return g;
+          });
+          if (hasChange) {
+            try {
+              localStorage.setItem("hostelhire_saved_gigs", JSON.stringify(updated));
+            } catch {}
+          }
+          return hasChange ? updated : prevGigs;
+        });
+
+        setSelectedGig((prev) => {
+          if (!prev) return null;
+          const dec = syncdDecisions.find((d) => d.gigId === prev.id);
+          if (dec && prev.status !== dec.decision) {
+            return {
+              ...prev,
+              status: dec.decision as any,
+              provider: {
+                ...prev.provider,
+                phone_number: dec.unlockedPhone || prev.provider?.phone_number || "+91 9876543211",
+              },
+            };
+          }
+          return prev;
+        });
+      }
+
+      // 2. If incoming service requests exist for current user, ensure they appear in their gigs
+      if (syncdRequests.length > 0 && user) {
+        setGigs((prevGigs) => {
+          let hasChange = false;
+          const newGigs = [...prevGigs];
+
+          for (const req of syncdRequests) {
+            if (req.providerId === user.id || req.seekerId === user.id) {
+              const existing = newGigs.find((g) => g.id === req.gigId);
+              const dec = syncdDecisions.find((d) => d.gigId === req.gigId);
+              const targetStatus = dec ? dec.decision : "INTERESTED";
+
+              if (!existing) {
+                hasChange = true;
+                newGigs.unshift({
+                  id: req.gigId,
+                  source_type: "LISTING",
+                  source_id: req.listingId || req.gigId,
+                  seeker_id: req.seekerId,
+                  provider_id: req.providerId,
+                  accepted_interest_id: `int-${req.gigId}`,
+                  agreed_price: req.agreedPrice || 80,
+                  status: targetStatus as any,
+                  created_at: req.timestamp || new Date().toISOString(),
+                  seeker: {
+                    id: req.seekerId,
+                    full_name: req.seekerName,
+                    hostel_block: req.seekerHostel,
+                    department: req.seekerDepartment || "Engineering",
+                    phone_number: req.seekerPhone || "+91 9876543210",
+                  },
+                  provider: {
+                    id: req.providerId,
+                    full_name: req.providerName,
+                    hostel_block: req.providerHostel,
+                    phone_number: dec?.unlockedPhone || req.providerPhone || "+91 9876543211",
+                  },
+                });
+              } else if (dec && existing.status !== dec.decision) {
+                hasChange = true;
+                const idx = newGigs.findIndex((g) => g.id === req.gigId);
+                newGigs[idx] = {
+                  ...existing,
+                  status: dec.decision as any,
+                  provider: {
+                    ...existing.provider,
+                    phone_number: dec.unlockedPhone || existing.provider?.phone_number || "+91 9876543211",
+                  },
+                };
+              }
+            }
+          }
+
+          if (hasChange) {
+            try {
+              localStorage.setItem("hostelhire_saved_gigs", JSON.stringify(newGigs));
+            } catch {}
+          }
+          return hasChange ? newGigs : prevGigs;
+        });
       }
     } catch (err) {
       console.error("Data sync error:", err);
@@ -450,7 +571,8 @@ export default function Home() {
     }
 
     const gigObj = gigs.find((g) => g.id === gigId) || selectedGig;
-    const providerName = (gigObj as any)?.provider?.full_name || "Female Provider";
+    const provider = (gigObj as any)?.provider;
+    const providerName = provider?.full_name || "Female Provider";
 
     setNotifications((prev) => [
       {
@@ -466,21 +588,28 @@ export default function Home() {
 
     // Cross-device sync to Supabase so the girl's mobile fetches the request in realtime
     try {
-      await createServiceRequest({
-        seeker_id: user.id,
-        title: `[Service Request] ${(gigObj as any)?.provider?.full_name || 'Service'}`,
-        description: note || `Service requested by ${user.full_name} (${user.hostel_block})`,
-        skill_category: "Academic Support",
-        expected_budget: gigObj?.agreed_price || 80,
-        urgency: "Request Pending Approval",
-        is_open: true,
-      }, user);
+      await recordServiceRequest({
+        gigId,
+        listingId: gigObj?.source_id,
+        seekerId: user.id,
+        seekerName: user.full_name,
+        seekerHostel: user.hostel_block,
+        seekerDepartment: user.department,
+        seekerPhone: user.phone_number,
+        providerId: gigObj?.provider_id || provider?.id || "",
+        providerName,
+        providerHostel: provider?.hostel_block || "Girls Hostel 2",
+        providerPhone: provider?.phone_number || "+91 9876543211",
+        note: note || "Requested service via HostelHire",
+        agreedPrice: gigObj?.agreed_price || 80,
+      });
+      await loadData();
     } catch (e) {
       console.warn("Supabase moderation request sync notice:", e);
     }
   };
 
-  const handleAcceptServiceRequest = (gigId: string) => {
+  const handleAcceptServiceRequest = async (gigId: string) => {
     setGigs((prev) => {
       const updated = prev.map((g) => (g.id === gigId ? { ...g, status: "ACCEPTED" as const } : g));
       try { localStorage.setItem("hostelhire_saved_gigs", JSON.stringify(updated)); } catch {}
@@ -489,11 +618,27 @@ export default function Home() {
     if (selectedGig && selectedGig.id === gigId) {
       setSelectedGig((prev) => (prev ? { ...prev, status: "ACCEPTED" } : null));
     }
+
+    // Write approval decision to Supabase so the boy's mobile receives it and unlocks contact info
+    const targetGig = gigs.find((g) => g.id === gigId) || selectedGig;
+    try {
+      await recordServiceDecision(
+        gigId,
+        "ACCEPTED",
+        user.id,
+        targetGig?.seeker_id || "",
+        user.phone_number || "+91 9876543211"
+      );
+      await loadData();
+    } catch (e) {
+      console.warn("Supabase record decision notice:", e);
+    }
+
     setNotifications((prev) => [
       {
         id: `notif-${Date.now()}`,
         title: "Request Approved! ⚡",
-        message: "Service request accepted. Campus Common Hub meeting & contact unlocked.",
+        message: "You accepted the request. Campus Common Hub meeting & contact coordinates unlocked.",
         time: "Just now",
         read: false,
         type: "gig",
@@ -502,7 +647,7 @@ export default function Home() {
     ]);
   };
 
-  const handleRejectServiceRequest = (gigId: string) => {
+  const handleRejectServiceRequest = async (gigId: string) => {
     setGigs((prev) => {
       const updated = prev.map((g) => (g.id === gigId ? { ...g, status: "CANCELLED" as const } : g));
       try { localStorage.setItem("hostelhire_saved_gigs", JSON.stringify(updated)); } catch {}
@@ -511,6 +656,20 @@ export default function Home() {
     if (selectedGig && selectedGig.id === gigId) {
       setSelectedGig((prev) => (prev ? { ...prev, status: "CANCELLED" } : null));
     }
+
+    const targetGig = gigs.find((g) => g.id === gigId) || selectedGig;
+    try {
+      await recordServiceDecision(
+        gigId,
+        "CANCELLED",
+        user.id,
+        targetGig?.seeker_id || ""
+      );
+      await loadData();
+    } catch (e) {
+      console.warn("Supabase record decline notice:", e);
+    }
+
     setNotifications((prev) => [
       {
         id: `notif-${Date.now()}`,
