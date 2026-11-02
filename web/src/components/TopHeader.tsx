@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Bell, ShieldCheck } from "lucide-react";
+import { Bell } from "lucide-react";
 import { RoleSwitcher } from "./RoleSwitcher";
 
 interface TopHeaderProps {
@@ -28,10 +28,6 @@ export function TopHeader({
             <h1 className="text-base font-bold text-[#0F172A] tracking-tight leading-none">
               HostelHire
             </h1>
-            <span className="hh-badge-verified text-[10px] py-0.5 px-1.5 whitespace-nowrap inline-flex items-center gap-1 shrink-0">
-              <ShieldCheck className="w-3 h-3 text-[#059669]" />
-              JEC
-            </span>
           </div>
           <p className="text-[11px] text-[#64748B] font-medium leading-tight mt-0.5">
             Jorhat Engineering College
