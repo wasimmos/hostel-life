@@ -2,6 +2,110 @@
  * Contact, WhatsApp, and Female Campus Privacy Shield utility functions for HostelHire
  */
 
+export interface ProviderReview {
+  id: string;
+  reviewerName: string;
+  reviewerHostel: string;
+  rating: number;
+  comment: string;
+  date: string;
+}
+
+export function getProviderReviews(providerId?: string): ProviderReview[] {
+  if (!providerId) return [];
+
+  // Wasim Ahmed (EE, Hostel 4)
+  if (providerId.startsWith("11111111")) {
+    return [
+      {
+        id: "rev-w1",
+        reviewerName: "Bikash Kalita",
+        reviewerHostel: "Hostel 1",
+        rating: 5,
+        comment: "Cleaned my laptop fan completely and replaced thermal paste right in his room. Temps dropped by 18°C. Highly recommend!",
+        date: "2 days ago",
+      },
+      {
+        id: "rev-w2",
+        reviewerName: "Debojit Sharma",
+        reviewerHostel: "Hostel 4",
+        rating: 5,
+        comment: "Helped me dual boot Ubuntu 24.04 alongside Windows 11 for our OS lab assignment. Very patient senior.",
+        date: "5 days ago",
+      },
+      {
+        id: "rev-w3",
+        reviewerName: "Anupam Saikia",
+        reviewerHostel: "Hostel 3",
+        rating: 4.8,
+        comment: "Fixed my laptop charging port pin and replaced thermal pads. Works like new.",
+        date: "1 week ago",
+      },
+    ];
+  }
+
+  // Rhea Goswami (CSE, Girls Hostel 2)
+  if (providerId.startsWith("22222222")) {
+    return [
+      {
+        id: "rev-r1",
+        reviewerName: "Wasim Ahmed",
+        reviewerHostel: "Hostel 4",
+        rating: 5,
+        comment: "Formatted my 45-page IEEE major project seminar report in LaTeX with zero margin errors. Handed over at Central Library.",
+        date: "3 days ago",
+      },
+      {
+        id: "rev-r2",
+        reviewerName: "Preeti Saikia",
+        reviewerHostel: "Girls Hostel 1",
+        rating: 5,
+        comment: "Helped me derive FFT butterflies and IIR Butterworth filters in GH study room before internals. Scored top marks!",
+        date: "1 week ago",
+      },
+      {
+        id: "rev-r3",
+        reviewerName: "Sneha Dutta",
+        reviewerHostel: "Girls Hostel 2",
+        rating: 5,
+        comment: "Fixed table overflow and bibtex citation formatting issues in my lab manual overnight.",
+        date: "2 weeks ago",
+      },
+    ];
+  }
+
+  // Anupam Saikia (EE, Hostel 3)
+  if (providerId.startsWith("33333333")) {
+    return [
+      {
+        id: "rev-a1",
+        reviewerName: "Debojit Sharma",
+        reviewerHostel: "Hostel 4",
+        rating: 5,
+        comment: "Guided me through isometric projections and sectional views for Engineering Graphics sheet submission.",
+        date: "4 days ago",
+      },
+    ];
+  }
+
+  // Newly registered students have 0 peer reviews until completed
+  return [];
+}
+
+export function getProviderDefaultSkills(providerId?: string): string[] {
+  if (!providerId) return [];
+  if (providerId.startsWith("11111111")) {
+    return ["Thermal Paste & Cleaning", "Windows 11 Dual Boot", "C++ Tutoring", "Circuit Soldering"];
+  }
+  if (providerId.startsWith("22222222")) {
+    return ["LaTeX Typesetting", "IEEE Report Formatting", "Digital Signal Processing", "Python Programming"];
+  }
+  if (providerId.startsWith("33333333")) {
+    return ["Engineering Graphics (ED)", "AutoCAD 2D", "Isometric Projections"];
+  }
+  return [];
+}
+
 export function getProviderRating(providerId?: string): { rating: number; reviewCount: number } {
   if (!providerId) return { rating: 5.0, reviewCount: 6 };
   if (providerId.startsWith("11111111")) return { rating: 4.9, reviewCount: 18 }; // Wasim

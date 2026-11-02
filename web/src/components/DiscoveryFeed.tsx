@@ -10,6 +10,7 @@ interface DiscoveryFeedProps {
   requests: (ServiceRequest & { seeker: any })[];
   onSelectListing: (listing: ServiceListing) => void;
   onSelectRequest: (request: ServiceRequest) => void;
+  onSelectProvider?: (provider: Profile) => void;
   currentUser?: Profile;
   onRefresh?: () => void;
 }
@@ -19,6 +20,7 @@ export function DiscoveryFeed({
   requests,
   onSelectListing,
   onSelectRequest,
+  onSelectProvider,
   currentUser,
   onRefresh,
 }: DiscoveryFeedProps) {
@@ -144,13 +146,22 @@ export function DiscoveryFeed({
               >
                 {/* Header: Provider Info & Verification */}
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-[#eaedff] text-[#1E40AF] font-bold text-xs flex items-center justify-center">
+                  <div
+                    className="flex items-center gap-2 cursor-pointer group"
+                    onClick={(e) => {
+                      if (onSelectProvider && listing.provider) {
+                        e.stopPropagation();
+                        onSelectProvider(listing.provider as Profile);
+                      }
+                    }}
+                    title={`View ${listing.provider?.full_name}'s Public Profile`}
+                  >
+                    <div className="w-7 h-7 rounded-full bg-[#eaedff] group-hover:bg-[#dbe4ff] text-[#1E40AF] font-bold text-xs flex items-center justify-center transition-colors">
                       {listing.provider?.full_name?.charAt(0) || "P"}
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs font-bold text-[#0F172A]">
+                        <span className="text-xs font-bold text-[#0F172A] group-hover:text-[#1E40AF] group-hover:underline transition-colors">
                           {listing.provider?.full_name}
                         </span>
                         <ShieldCheck className="w-3.5 h-3.5 text-[#059669]" />

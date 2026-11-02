@@ -8,6 +8,7 @@ import { GigLifecycleView } from "@/components/GigLifecycleView";
 import { PostModal } from "@/components/PostModal";
 import { AuthModal } from "@/components/AuthModal";
 import { ProfileView } from "@/components/ProfileView";
+import { PublicProfileView } from "@/components/PublicProfileView";
 import { MyGigsList } from "@/components/MyGigsList";
 import { EarningsView } from "@/components/EarningsView";
 import { AdminPanel } from "@/components/AdminPanel";
@@ -26,12 +27,13 @@ import {
   recordServiceDecision,
   fetchServiceModerations,
 } from "@/lib/api";
-import { ServiceListing, ServiceRequest, Gig, Review } from "@/types/database.types";
+import { ServiceListing, ServiceRequest, Gig, Review, Profile } from "@/types/database.types";
 
 export default function Home() {
   const { user, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>("explore");
   const [selectedGig, setSelectedGig] = useState<Gig | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<Profile | null>(null);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [isAdminView, setIsAdminView] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -475,6 +477,7 @@ export default function Home() {
       setIsPostModalOpen(true);
     } else {
       setSelectedGig(null);
+      setSelectedProvider(null);
       setIsAdminView(false);
       setActiveTab(tab);
     }
@@ -683,6 +686,52 @@ export default function Home() {
     ]);
   };
 
+  const handleSelectListing = (listing: ServiceListing) => {
+    const existing = gigs.find((g) => g.source_id === listing.id);
+    if (existing) {
+      setSelectedGig(existing);
+    } else {
+      const providerBlock = (listing as any).provider?.hostel_block;
+      const isProviderFemale = isFemaleHostel(providerBlock);
+      const isSeekerMale = !isFemaleHostel(user.hostel_block);
+      const requiresModeration = isProviderFemale && isSeekerMale;
+
+      const newGig: Gig & { seeker: any; provider: any } = {
+        id: `gig-${Date.now().toString().slice(-4)}`,
+        source_type: "LISTING",
+        source_id: listing.id,
+        seeker_id: user.id,
+        provider_id: listing.provider_id,
+        accepted_interest_id: `int-${Date.now()}`,
+        agreed_price: listing.indicative_price,
+        status: requiresModeration ? "OPEN" : "ACCEPTED",
+        created_at: new Date().toISOString(),
+        seeker: user,
+        provider: (listing as any).provider,
+      };
+      setGigs([newGig, ...gigs]);
+      setSelectedGig(newGig);
+    }
+  };
+
+  const handleSelectRequest = (request: ServiceRequest) => {
+    const newGig: Gig & { seeker: any; provider: any } = {
+      id: `gig-${Date.now().toString().slice(-4)}`,
+      source_type: "REQUEST",
+      source_id: request.id,
+      seeker_id: request.seeker_id,
+      provider_id: user.id,
+      accepted_interest_id: `int-${Date.now()}`,
+      agreed_price: request.expected_budget,
+      status: "ACCEPTED",
+      created_at: new Date().toISOString(),
+      seeker: (request as any).seeker,
+      provider: user,
+    };
+    setGigs([newGig, ...gigs]);
+    setSelectedGig(newGig);
+  };
+
   if (!isAuthenticated) {
     return <LoginScreen />;
   }
@@ -697,10 +746,12 @@ export default function Home() {
         onNotificationClick={() => setIsNotificationsOpen(true)}
         onAdminClick={() => {
           setSelectedGig(null);
+          setSelectedProvider(null);
           setIsAdminView(!isAdminView);
         }}
         onProfileClick={() => {
           setSelectedGig(null);
+          setSelectedProvider(null);
           setIsAdminView(false);
           setActiveTab("profile");
         }}
@@ -709,6 +760,17 @@ export default function Home() {
       <main className="flex-1">
         {isAdminView ? (
           <AdminPanel onBack={() => setIsAdminView(false)} />
+        ) : selectedProvider ? (
+          <PublicProfileView
+            provider={selectedProvider}
+            currentUser={user}
+            listings={listings}
+            onBack={() => setSelectedProvider(null)}
+            onSelectListing={(listing) => {
+              setSelectedProvider(null);
+              handleSelectListing(listing);
+            }}
+          />
         ) : selectedGig ? (
           <GigLifecycleView
             gig={selectedGig}
@@ -727,60 +789,21 @@ export default function Home() {
             requests={requests}
             currentUser={user}
             onRefresh={loadData}
-            onSelectListing={(listing) => {
-              const existing = gigs.find((g) => g.source_id === listing.id);
-              if (existing) {
-                setSelectedGig(existing);
-              } else {
-                const providerBlock = (listing as any).provider?.hostel_block;
-                const isProviderFemale = isFemaleHostel(providerBlock);
-                const isSeekerMale = !isFemaleHostel(user.hostel_block);
-                const requiresModeration = isProviderFemale && isSeekerMale;
-
-                const newGig: Gig & { seeker: any; provider: any } = {
-                  id: `gig-${Date.now().toString().slice(-4)}`,
-                  source_type: "LISTING",
-                  source_id: listing.id,
-                  seeker_id: user.id,
-                  provider_id: listing.provider_id,
-                  accepted_interest_id: `int-${Date.now()}`,
-                  agreed_price: listing.indicative_price,
-                  status: requiresModeration ? "OPEN" : "ACCEPTED",
-                  created_at: new Date().toISOString(),
-                  seeker: user,
-                  provider: (listing as any).provider,
-                };
-                setGigs([newGig, ...gigs]);
-                setSelectedGig(newGig);
-              }
-            }}
-            onSelectRequest={(request) => {
-              const newGig: Gig & { seeker: any; provider: any } = {
-                id: `gig-${Date.now().toString().slice(-4)}`,
-                source_type: "REQUEST",
-                source_id: request.id,
-                seeker_id: request.seeker_id,
-                provider_id: user.id,
-                accepted_interest_id: `int-${Date.now()}`,
-                agreed_price: request.expected_budget,
-                status: "ACCEPTED",
-                created_at: new Date().toISOString(),
-                seeker: (request as any).seeker,
-                provider: user,
-              };
-              setGigs([newGig, ...gigs]);
-              setSelectedGig(newGig);
-            }}
+            onSelectListing={handleSelectListing}
+            onSelectRequest={handleSelectRequest}
+            onSelectProvider={(p) => setSelectedProvider(p)}
           />
         ) : activeTab === "activity" ? (
           <MyGigsList gigs={gigs} onSelectGig={(g) => setSelectedGig(g)} />
         ) : activeTab === "earnings" ? (
-          <EarningsView />
+          <EarningsView currentUser={user} gigs={gigs} />
         ) : (
           <ProfileView
             profile={user}
-            reviews={mockReviews}
+            gigs={gigs}
+            listings={listings}
             onBack={() => setActiveTab("explore")}
+            onPostServiceClick={() => setIsPostModalOpen(true)}
           />
         )}
       </main>
