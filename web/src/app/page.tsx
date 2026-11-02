@@ -11,6 +11,8 @@ import { ProfileView } from "@/components/ProfileView";
 import { MyGigsList } from "@/components/MyGigsList";
 import { EarningsView } from "@/components/EarningsView";
 import { AdminPanel } from "@/components/AdminPanel";
+import { LoginScreen } from "@/components/LoginScreen";
+import { NotificationsModal, NotificationItem } from "@/components/NotificationsModal";
 import { useAuth } from "@/context/AuthContext";
 import {
   fetchListings,
@@ -23,11 +25,48 @@ import {
 import { ServiceListing, ServiceRequest, Gig, Review } from "@/types/database.types";
 
 export default function Home() {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>("explore");
   const [selectedGig, setSelectedGig] = useState<Gig | null>(null);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [isAdminView, setIsAdminView] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+
+  // Campus Notifications State
+  const [notifications, setNotifications] = useState<NotificationItem[]>([
+    {
+      id: "notif-1",
+      title: "Interest Accepted! ⚡",
+      message: "Wasim Ahmed accepted your request for 'LaTeX S5 Lab Manual'. Contact details unlocked.",
+      time: "5m ago",
+      read: false,
+      type: "gig",
+    },
+    {
+      id: "notif-2",
+      title: "New Student Interest 💬",
+      message: "Debojit Sharma proposed ₹180 for 'Laptop Thermal Paste Cleanout'.",
+      time: "40m ago",
+      read: false,
+      type: "gig",
+    },
+    {
+      id: "notif-3",
+      title: "Payment Recorded 💰",
+      message: "₹80 payment confirmed for IEEE Seminar Report Typesetting.",
+      time: "2h ago",
+      read: false,
+      type: "payment",
+    },
+    {
+      id: "notif-4",
+      title: "Hostel 4 Maintenance 📢",
+      message: "LAN switch maintenance scheduled tomorrow 2:00 PM – 4:00 PM.",
+      time: "1d ago",
+      read: true,
+      type: "alert",
+    },
+  ]);
 
   // Discovery Listings State
   const [listings, setListings] = useState<(ServiceListing & { provider: any })[]>([
@@ -342,10 +381,18 @@ export default function Home() {
     }
   };
 
+  if (!isAuthenticated) {
+    return <LoginScreen />;
+  }
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
   return (
     <>
       <TopHeader
         isAdmin={user.is_admin}
+        unreadCount={unreadCount}
+        onNotificationClick={() => setIsNotificationsOpen(true)}
         onAdminClick={() => {
           setSelectedGig(null);
           setIsAdminView(!isAdminView);
@@ -433,6 +480,24 @@ export default function Home() {
       />
 
       <AuthModal />
+
+      <NotificationsModal
+        isOpen={isNotificationsOpen}
+        onClose={() => setIsNotificationsOpen(false)}
+        notifications={notifications}
+        onMarkAllRead={() => {
+          setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+        }}
+        onSelectNotification={(item) => {
+          setNotifications((prev) =>
+            prev.map((n) => (n.id === item.id ? { ...n, read: true } : n))
+          );
+          if (item.type === "gig") {
+            setIsNotificationsOpen(false);
+            if (gigs.length > 0) setSelectedGig(gigs[0]);
+          }
+        }}
+      />
 
       <BottomNav
         activeTab={isAdminView ? "explore" : activeTab}

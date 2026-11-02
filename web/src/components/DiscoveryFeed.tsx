@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, ShieldCheck, Clock, Zap, ArrowRight, MessageSquarePlus } from "lucide-react";
+import { Search, ShieldCheck, Clock, Zap, ArrowRight, MessageSquarePlus, MessageCircle } from "lucide-react";
 import { ServiceListing, ServiceRequest } from "@/types/database.types";
+import { getWhatsAppUrl } from "@/lib/contact";
 
 interface DiscoveryFeedProps {
   listings: (ServiceListing & { provider: any })[];
@@ -171,10 +172,26 @@ export function DiscoveryFeed({
                     </span>
                   </div>
 
-                  <button className="hh-btn-primary py-1.5 px-3 text-xs flex items-center gap-1">
-                    <span>Express Interest</span>
-                    <ArrowRight className="w-3 h-3" />
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <a
+                      href={getWhatsAppUrl(
+                        listing.provider?.phone_number,
+                        `Hi ${listing.provider?.full_name || "peer"}, I saw your HostelHire listing "${listing.title}" (₹${listing.indicative_price}). Are you available to help?`
+                      )}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="p-1.5 rounded-lg border border-[#A7F3D0] bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5] transition-colors flex items-center justify-center"
+                      title="Direct WhatsApp Message"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                    </a>
+
+                    <button className="hh-btn-primary py-1 px-2.5 text-xs flex items-center gap-1">
+                      <span>Express Interest</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))
@@ -222,10 +239,26 @@ export function DiscoveryFeed({
                   Posted by <strong className="text-[#0F172A]">{request.seeker?.full_name}</strong>
                 </span>
 
-                <button className="hh-btn-secondary py-1.5 px-3 text-xs flex items-center gap-1 text-[#1E40AF] font-bold">
-                  <MessageSquarePlus className="w-3 h-3" />
-                  <span>Offer to Help</span>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <a
+                    href={getWhatsAppUrl(
+                      request.seeker?.phone_number,
+                      `Hi ${request.seeker?.full_name || "peer"}, I saw your HostelHire request "${request.title}" (Budget: ₹${request.expected_budget}). I can help you with this!`
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="p-1.5 rounded-lg border border-[#A7F3D0] bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5] transition-colors flex items-center justify-center"
+                    title="Direct WhatsApp Message"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                  </a>
+
+                  <button className="hh-btn-secondary py-1 px-2.5 text-xs flex items-center gap-1 text-[#1E40AF] font-bold">
+                    <MessageSquarePlus className="w-3 h-3" />
+                    <span>Offer to Help</span>
+                  </button>
+                </div>
               </div>
             </div>
           ))

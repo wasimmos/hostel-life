@@ -11,8 +11,11 @@ import {
   AlertTriangle,
   ShieldCheck,
   ArrowLeft,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Gig, Profile } from "@/types/database.types";
+import { getWhatsAppUrl, getTelUrl } from "@/lib/contact";
 
 interface GigLifecycleViewProps {
   gig: Gig;
@@ -30,6 +33,7 @@ export function GigLifecycleView({
   onConsentContact,
 }: GigLifecycleViewProps) {
   const [contactShared, setContactShared] = useState(true); // Demo default unlocked or toggleable
+  const [copied, setCopied] = useState(false);
   const [hasConfirmed, setHasConfirmed] = useState(
     gig.status === "COMPLETED" || gig.status === "COMPLETION_PENDING"
   );
@@ -184,27 +188,40 @@ export function GigLifecycleView({
             </div>
             <div className="flex items-center justify-between text-xs">
               <span className="text-[#64748B]">Phone Number:</span>
-              <strong className="text-[#0F172A]">{otherParty?.phone_number || "+91 9876543210"}</strong>
+              <div className="flex items-center gap-1.5">
+                <strong className="text-[#0F172A]">{otherParty?.phone_number || "+91 9876543210"}</strong>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(otherParty?.phone_number || "+919876543210");
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  className="p-1 hover:bg-[#E2E8F0] rounded text-[#64748B] hover:text-[#0F172A]"
+                  title="Copy Phone Number"
+                >
+                  {copied ? <Check className="w-3.5 h-3.5 text-[#059669]" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </div>
             </div>
 
             {/* External Coordination Handover Action */}
             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#E2E8F0]">
               <a
-                href={`https://wa.me/919876543210?text=Hi%20${encodeURIComponent(
-                  otherParty?.full_name || ""
-                )},%20I%20am%20coordinating%20for%20our%20HostelHire%20gig%20(Agreed:%20₹${
-                  gig.agreed_price
-                })`}
+                href={getWhatsAppUrl(
+                  otherParty?.phone_number,
+                  `Hi ${otherParty?.full_name || "peer"}, I am coordinating with you for our HostelHire gig (Agreed: ₹${gig.agreed_price}). Are you free to talk/meet?`
+                )}
                 target="_blank"
-                rel="noreferrer"
-                className="hh-btn-secondary py-2 text-xs flex items-center justify-center gap-1.5 bg-[#ECFDF5] border-[#A7F3D0] text-[#059669] font-bold"
+                rel="noopener noreferrer"
+                className="hh-btn-secondary py-2 text-xs flex items-center justify-center gap-1.5 bg-[#ECFDF5] border-[#A7F3D0] text-[#059669] font-bold hover:bg-[#D1FAE5]"
               >
                 <MessageCircle className="w-3.5 h-3.5" />
                 <span>WhatsApp</span>
               </a>
               <a
-                href="tel:+919876543210"
-                className="hh-btn-secondary py-2 text-xs flex items-center justify-center gap-1.5 font-bold"
+                href={getTelUrl(otherParty?.phone_number)}
+                className="hh-btn-secondary py-2 text-xs flex items-center justify-center gap-1.5 font-bold hover:bg-[#F1F5F9]"
               >
                 <Phone className="w-3.5 h-3.5 text-[#475569]" />
                 <span>Call Peer</span>

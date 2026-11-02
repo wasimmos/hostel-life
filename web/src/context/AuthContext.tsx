@@ -77,28 +77,47 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (open: boolean) => void;
+  setDirectLogin: (logged: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: DEMO_PROFILES[0],
   switchUser: () => {},
   availableUsers: DEMO_PROFILES,
-  isAuthenticated: true,
+  isAuthenticated: false,
   isRealAuth: false,
   signIn: async () => ({}),
   signUp: async () => ({}),
   signOut: async () => {},
   isAuthModalOpen: false,
   setIsAuthModalOpen: () => {},
+  setDirectLogin: () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [currentUser, setCurrentUser] = useState<Profile>(DEMO_PROFILES[0]);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isRealAuth, setIsRealAuth] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const supabase = createClient();
 
+  // Initialize session / check local login status on mount
   useEffect(() => {
+    try {
+      const savedLogin = localStorage.getItem("hostelhire_logged_in");
+      const savedUserId = localStorage.getItem("hostelhire_user_id");
+
+      if (savedLogin === "true") {
+        setIsAuthenticated(true);
+        if (savedUserId) {
+          const match = DEMO_PROFILES.find((p) => p.id === savedUserId);
+          if (match) setCurrentUser(match);
+        }
+      }
+    } catch {
+      // Safe fallback if SSR / storage disabled
+    }
+
     if (!isSupabaseConfigured()) return;
 
     const checkSession = async () => {
@@ -114,6 +133,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (profile) {
             setCurrentUser(profile);
             setIsRealAuth(true);
+            setIsAuthenticated(true);
+            localStorage.setItem("hostelhire_logged_in", "true");
+            localStorage.setItem("hostelhire_user_id", profile.id);
           }
         }
       } catch (e) {
@@ -134,9 +156,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (profile) {
             setCurrentUser(profile);
             setIsRealAuth(true);
+            setIsAuthenticated(true);
+            localStorage.setItem("hostelhire_logged_in", "true");
+            localStorage.setItem("hostelhire_user_id", profile.id);
           }
         } else if (event === "SIGNED_OUT") {
           setIsRealAuth(false);
+          setIsAuthenticated(false);
+          localStorage.removeItem("hostelhire_logged_in");
           setCurrentUser(DEMO_PROFILES[0]);
         }
       }
@@ -147,11 +174,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  const setDirectLogin = (logged: boolean) => {
+    setIsAuthenticated(logged);
+    if (logged) {
+      localStorage.setItem("hostelhire_logged_in", "true");
+      localStorage.setItem("hostelhire_user_id", currentUser.id);
+    } else {
+      localStorage.removeItem("hostelhire_logged_in");
+    }
+  };
+
   const switchUser = (userId: string) => {
     const found = DEMO_PROFILES.find((p) => p.id === userId);
     if (found) {
       setCurrentUser(found);
       setIsRealAuth(false);
+      localStorage.setItem("hostelhire_user_id", found.id);
     }
   };
 
@@ -243,6 +281,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await supabase.auth.signOut();
     }
     setIsRealAuth(false);
+    setIsAuthenticated(false);
+    try {
+      localStorage.removeItem("hostelhire_logged_in");
+    } catch {}
     setCurrentUser(DEMO_PROFILES[0]);
   };
 
@@ -252,13 +294,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user: currentUser,
         switchUser,
         availableUsers: DEMO_PROFILES,
-        isAuthenticated: true,
+        isAuthenticated,
         isRealAuth,
         signIn,
         signUp,
         signOut,
         isAuthModalOpen,
         setIsAuthModalOpen,
+        setDirectLogin,
       }}
     >
       {children}
