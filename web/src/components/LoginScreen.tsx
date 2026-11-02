@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { ShieldCheck, Mail, Lock, User, Hash, Phone, AlertCircle, ArrowRight, Sparkles, Building2 } from "lucide-react";
+import { ShieldCheck, Mail, Lock, User, Hash, Phone, AlertCircle, ArrowRight, Sparkles, Building2, Check } from "lucide-react";
 import { useAuth, DEMO_PROFILES } from "@/context/AuthContext";
 
 interface LoginScreenProps {
@@ -13,10 +13,36 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const [tab, setTab] = useState<"signin" | "signup">("signin");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [selectedAutofill, setSelectedAutofill] = useState<"wasim" | "rhea" | null>(null);
 
   // Sign In State
   const [signInEmail, setSignInEmail] = useState("");
   const [signInPassword, setSignInPassword] = useState("");
+
+  const handleAutofill = (emailVal: string, passwordVal: string, persona: "wasim" | "rhea") => {
+    setSignInEmail(emailVal);
+    setSignInPassword(passwordVal);
+    setSelectedAutofill(persona);
+    setErrorMessage("");
+  };
+
+  const handleQuickLogin = async (e: React.MouseEvent, emailVal: string, passwordVal: string) => {
+    e.stopPropagation();
+    setSignInEmail(emailVal);
+    setSignInPassword(passwordVal);
+    setErrorMessage("");
+    setLoading(true);
+
+    const res = await signIn(emailVal, passwordVal);
+    setLoading(false);
+
+    if (res.error) {
+      setErrorMessage(res.error);
+    } else {
+      setDirectLogin(true);
+      if (onLoginSuccess) onLoginSuccess();
+    }
+  };
 
   // Sign Up State
   const [fullName, setFullName] = useState("");
@@ -144,38 +170,81 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                   <ShieldCheck className="w-3.5 h-3.5" />
                   Campus Login Credentials
                 </span>
-                <span className="text-[10px] text-[#15803D] font-medium">Tap to Autofill</span>
+                <span className="text-[10px] text-[#15803D] font-semibold bg-[#DCFCE7] px-2 py-0.5 rounded-full border border-[#86EFAC]">
+                  Tap to Autofill
+                </span>
               </div>
+
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div
-                  onClick={() => {
-                    setSignInEmail("wasim.ee@jecassam.ac.in");
-                    setSignInPassword("admin@jec123");
-                  }}
-                  className="p-2 bg-white rounded-lg border border-[#86EFAC] cursor-pointer hover:bg-[#DCFCE7] transition-all"
+                <button
+                  type="button"
+                  onClick={() => handleAutofill("wasim.ee@jecassam.ac.in", "admin@jec123", "wasim")}
+                  className={`p-2.5 rounded-lg border text-left transition-all active:scale-[0.98] ${
+                    selectedAutofill === "wasim"
+                      ? "bg-[#DCFCE7] border-[#16A34A] ring-2 ring-[#86EFAC] shadow-xs"
+                      : "bg-white border-[#86EFAC] hover:bg-[#F0FDF4]"
+                  }`}
                 >
                   <div className="font-bold text-[#15803D] flex items-center justify-between">
                     <span>Wasim (Admin)</span>
-                    <span className="text-[9px] px-1 bg-[#FEF3C7] text-[#92400E] rounded font-bold">Admin</span>
+                    <span
+                      className={`text-[9px] px-1.5 py-0.5 rounded font-bold transition-colors ${
+                        selectedAutofill === "wasim"
+                          ? "bg-[#16A34A] text-white"
+                          : "bg-[#FEF3C7] text-[#92400E]"
+                      }`}
+                    >
+                      {selectedAutofill === "wasim" ? "✓ Filled" : "Admin"}
+                    </span>
                   </div>
                   <div className="text-[10px] text-[#475569] mt-0.5 truncate">wasim.ee@jecassam.ac.in</div>
                   <div className="text-[10px] font-mono text-[#166534] mt-0.5 font-bold">admin@jec123</div>
-                </div>
+                  <div className="mt-1.5 pt-1.5 border-t border-[#BBF7D0] flex items-center justify-between">
+                    <span className="text-[9px] text-[#15803D] font-bold">Tap to fill</span>
+                    <span
+                      onClick={(e) => handleQuickLogin(e, "wasim.ee@jecassam.ac.in", "admin@jec123")}
+                      className="text-[9px] bg-[#16A34A] text-white px-2 py-0.5 rounded font-bold hover:bg-[#15803D] shadow-xs transition-colors"
+                      title="1-Tap Instant Sign In as Wasim"
+                    >
+                      Login →
+                    </span>
+                  </div>
+                </button>
 
-                <div
-                  onClick={() => {
-                    setSignInEmail("rhea.cse@jecassam.ac.in");
-                    setSignInPassword("rhea@jec123");
-                  }}
-                  className="p-2 bg-white rounded-lg border border-[#86EFAC] cursor-pointer hover:bg-[#DCFCE7] transition-all"
+                <button
+                  type="button"
+                  onClick={() => handleAutofill("rhea.cse@jecassam.ac.in", "rhea@jec123", "rhea")}
+                  className={`p-2.5 rounded-lg border text-left transition-all active:scale-[0.98] ${
+                    selectedAutofill === "rhea"
+                      ? "bg-[#DCFCE7] border-[#16A34A] ring-2 ring-[#86EFAC] shadow-xs"
+                      : "bg-white border-[#86EFAC] hover:bg-[#F0FDF4]"
+                  }`}
                 >
                   <div className="font-bold text-[#15803D] flex items-center justify-between">
                     <span>Rhea (GH 2)</span>
-                    <span className="text-[9px] px-1 bg-[#F3E8FF] text-[#7E22CE] rounded font-bold">Female</span>
+                    <span
+                      className={`text-[9px] px-1.5 py-0.5 rounded font-bold transition-colors ${
+                        selectedAutofill === "rhea"
+                          ? "bg-[#16A34A] text-white"
+                          : "bg-[#F3E8FF] text-[#7E22CE]"
+                      }`}
+                    >
+                      {selectedAutofill === "rhea" ? "✓ Filled" : "Female"}
+                    </span>
                   </div>
                   <div className="text-[10px] text-[#475569] mt-0.5 truncate">rhea.cse@jecassam.ac.in</div>
                   <div className="text-[10px] font-mono text-[#166534] mt-0.5 font-bold">rhea@jec123</div>
-                </div>
+                  <div className="mt-1.5 pt-1.5 border-t border-[#BBF7D0] flex items-center justify-between">
+                    <span className="text-[9px] text-[#15803D] font-bold">Tap to fill</span>
+                    <span
+                      onClick={(e) => handleQuickLogin(e, "rhea.cse@jecassam.ac.in", "rhea@jec123")}
+                      className="text-[9px] bg-[#16A34A] text-white px-2 py-0.5 rounded font-bold hover:bg-[#15803D] shadow-xs transition-colors"
+                      title="1-Tap Instant Sign In as Rhea"
+                    >
+                      Login →
+                    </span>
+                  </div>
+                </button>
               </div>
             </div>
 
