@@ -3,16 +3,7 @@
 -- Run this in Supabase SQL Editor
 -- ============================================================================
 
--- 1. Restore auth.users clean state
-delete from auth.users where id in (
-  '11111111-1111-1111-1111-111111111111',
-  '22222222-2222-2222-2222-222222222222',
-  '33333333-3333-3333-3333-333333333333',
-  '44444444-4444-4444-4444-444444444444',
-  '55555555-5555-5555-5555-555555555555'
-);
-
--- 2. Drop the restrictive foreign key from profiles so demo students and registered students can coexist
+-- 1. Drop the restrictive foreign key from profiles so demo students and registered students can coexist
 alter table public.profiles drop constraint if exists profiles_id_fkey;
 
 -- 3. Public Read RLS Policies (Allows marketplace browsing on web)
