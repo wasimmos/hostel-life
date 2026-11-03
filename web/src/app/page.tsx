@@ -374,33 +374,46 @@ export default function Home() {
       if (syncdDecisions.length > 0) {
         // Auto-remove any completed listings or requests across all devices
         const newlyCompletedSources = new Set<string>();
-        for (const dec of syncdDecisions) {
-          if (dec.decision === "COMPLETED" && dec.sourceId) {
-            newlyCompletedSources.add(dec.sourceId);
-          }
-        }
-        if (newlyCompletedSources.size > 0) {
-          setListings((prev) => prev.filter((l) => !newlyCompletedSources.has(l.id)));
-          setRequests((prev) => prev.filter((r) => !newlyCompletedSources.has(r.id)));
-        }
 
         setGigs((prevGigs) => {
           let hasChange = false;
           const updated = prevGigs.map((g) => {
-            const dec = syncdDecisions.find((d) => d.gigId === g.id);
-            if (dec && (g.status !== dec.decision || (dec.decision === "COMPLETED" && !g.completed_at))) {
-              hasChange = true;
-              // Check if current user is the requester or the provider
-              const isDirectParticipant = user && (user.id === g.seeker_id || user.id === g.provider_id);
-              const isProviderFemale = isFemaleHostel(g.provider?.hostel_block);
-              const isUserMale = !isFemaleHostel(user?.hostel_block);
-              // Crucial: Only attach unlocked phone number if the current user is the verified requester or provider!
-              const canReceivePhone = isDirectParticipant && (!isProviderFemale || !isUserMale || user.id === g.seeker_id);
+            const gigDecisions = syncdDecisions.filter((d) => d.gigId === g.id);
+            if (gigDecisions.length === 0) return g;
 
+            const isDirectCompleted = gigDecisions.some((d) => d.decision === "COMPLETED");
+            const confirmers = new Set<string>((g as any).confirmed_by_users || []);
+            for (const d of gigDecisions) {
+              if (d.decision === "COMPLETED" || d.decision === "CONFIRM_COMPLETION") {
+                if (d.confirmedBy) confirmers.add(d.confirmedBy);
+                if (d.providerId) confirmers.add(d.providerId);
+              }
+            }
+
+            const bothConfirmed = isDirectCompleted || (confirmers.has(g.seeker_id) && confirmers.has(g.provider_id));
+            const targetStatus = bothConfirmed ? "COMPLETED" : confirmers.size > 0 ? "COMPLETION_PENDING" : (gigDecisions[0]?.decision as any || g.status);
+
+            if (targetStatus === "COMPLETED" && g.source_id) {
+              newlyCompletedSources.add(g.source_id);
+            }
+
+            const dec = gigDecisions[0];
+            const isDirectParticipant = user && (user.id === g.seeker_id || user.id === g.provider_id);
+            const isProviderFemale = isFemaleHostel(g.provider?.hostel_block);
+            const isUserMale = !isFemaleHostel(user?.hostel_block);
+            const canReceivePhone = isDirectParticipant && (!isProviderFemale || !isUserMale || user.id === g.seeker_id);
+
+            const statusChanged = g.status !== targetStatus;
+            const completionMissing = targetStatus === "COMPLETED" && !g.completed_at;
+            const confirmersChanged = ((g as any).confirmed_by_users?.length || 0) !== confirmers.size;
+
+            if (statusChanged || completionMissing || confirmersChanged) {
+              hasChange = true;
               return {
                 ...g,
-                status: dec.decision as any,
-                completed_at: dec.decision === "COMPLETED" ? (dec.timestamp || new Date().toISOString()) : g.completed_at,
+                status: targetStatus as any,
+                completed_at: targetStatus === "COMPLETED" ? (g.completed_at || dec.timestamp || new Date().toISOString()) : g.completed_at,
+                confirmed_by_users: Array.from(confirmers),
                 provider: {
                   ...g.provider,
                   phone_number: (canReceivePhone && dec.unlockedPhone)
@@ -411,6 +424,7 @@ export default function Home() {
             }
             return g;
           });
+
           if (hasChange) {
             try {
               localStorage.setItem("hostelhire_saved_gigs", JSON.stringify(updated));
@@ -419,19 +433,44 @@ export default function Home() {
           return hasChange ? updated : prevGigs;
         });
 
+        if (newlyCompletedSources.size > 0) {
+          setListings((prev) => prev.filter((l) => !newlyCompletedSources.has(l.id)));
+          setRequests((prev) => prev.filter((r) => !newlyCompletedSources.has(r.id)));
+        }
+
         setSelectedGig((prev) => {
           if (!prev) return null;
-          const dec = syncdDecisions.find((d) => d.gigId === prev.id);
-          if (dec && (prev.status !== dec.decision || (dec.decision === "COMPLETED" && !prev.completed_at))) {
-            const isDirectParticipant = user && (user.id === prev.seeker_id || user.id === prev.provider_id);
-            const isProviderFemale = isFemaleHostel(prev.provider?.hostel_block);
-            const isUserMale = !isFemaleHostel(user?.hostel_block);
-            const canReceivePhone = isDirectParticipant && (!isProviderFemale || !isUserMale || user.id === prev.seeker_id);
+          const gigDecisions = syncdDecisions.filter((d) => d.gigId === prev.id);
+          if (gigDecisions.length === 0) return prev;
 
+          const isDirectCompleted = gigDecisions.some((d) => d.decision === "COMPLETED");
+          const confirmers = new Set<string>((prev as any).confirmed_by_users || []);
+          for (const d of gigDecisions) {
+            if (d.decision === "COMPLETED" || d.decision === "CONFIRM_COMPLETION") {
+              if (d.confirmedBy) confirmers.add(d.confirmedBy);
+              if (d.providerId) confirmers.add(d.providerId);
+            }
+          }
+
+          const bothConfirmed = isDirectCompleted || (confirmers.has(prev.seeker_id) && confirmers.has(prev.provider_id));
+          const targetStatus = bothConfirmed ? "COMPLETED" : confirmers.size > 0 ? "COMPLETION_PENDING" : (gigDecisions[0]?.decision as any || prev.status);
+
+          const dec = gigDecisions[0];
+          const isDirectParticipant = user && (user.id === prev.seeker_id || user.id === prev.provider_id);
+          const isProviderFemale = isFemaleHostel(prev.provider?.hostel_block);
+          const isUserMale = !isFemaleHostel(user?.hostel_block);
+          const canReceivePhone = isDirectParticipant && (!isProviderFemale || !isUserMale || user.id === prev.seeker_id);
+
+          const statusChanged = prev.status !== targetStatus;
+          const completionMissing = targetStatus === "COMPLETED" && !prev.completed_at;
+          const confirmersChanged = ((prev as any).confirmed_by_users?.length || 0) !== confirmers.size;
+
+          if (statusChanged || completionMissing || confirmersChanged) {
             const updated = {
               ...prev,
-              status: dec.decision as any,
-              completed_at: dec.decision === "COMPLETED" ? (dec.timestamp || new Date().toISOString()) : prev.completed_at,
+              status: targetStatus as any,
+              completed_at: targetStatus === "COMPLETED" ? (prev.completed_at || dec.timestamp || new Date().toISOString()) : prev.completed_at,
+              confirmed_by_users: Array.from(confirmers),
               provider: {
                 ...prev.provider,
                 phone_number: (canReceivePhone && dec.unlockedPhone)
@@ -486,17 +525,20 @@ export default function Home() {
                     phone_number: dec?.unlockedPhone || req.providerPhone || "+91 9876543211",
                   },
                 });
-              } else if (dec && existing.status !== dec.decision) {
-                hasChange = true;
-                const idx = newGigs.findIndex((g) => g.id === req.gigId);
-                newGigs[idx] = {
-                  ...existing,
-                  status: dec.decision as any,
-                  provider: {
-                    ...existing.provider,
-                    phone_number: dec.unlockedPhone || existing.provider?.phone_number || "+91 9876543211",
-                  },
-                };
+              } else if (dec) {
+                const targetDecStatus = dec.decision === "CONFIRM_COMPLETION" ? "COMPLETION_PENDING" : dec.decision;
+                if (existing.status !== targetDecStatus) {
+                  hasChange = true;
+                  const idx = newGigs.findIndex((g) => g.id === req.gigId);
+                  newGigs[idx] = {
+                    ...existing,
+                    status: targetDecStatus as any,
+                    provider: {
+                      ...existing.provider,
+                      phone_number: dec.unlockedPhone || existing.provider?.phone_number || "+91 9876543211",
+                    },
+                  };
+                }
               }
             }
           }
@@ -667,20 +709,56 @@ export default function Home() {
     }
 
     const targetGig = gigs.find((g) => g.id === gigId) || (selectedGig?.id === gigId ? selectedGig : null);
-    const completedAt = new Date().toISOString();
+    if (!targetGig) return;
+
+    // Determine the peer in this gig
+    const peerId = targetGig.seeker_id === user.id ? targetGig.provider_id : targetGig.seeker_id;
+    const existingConfirmers = new Set<string>((targetGig as any).confirmed_by_users || []);
+
+    // If the other party already confirmed (or gig was in COMPLETION_PENDING), mutual completion is now fulfilled!
+    const peerHasAlreadyConfirmed = Boolean(
+      targetGig.status === "COMPLETION_PENDING" ||
+      existingConfirmers.has(peerId)
+    );
+
+    existingConfirmers.add(user.id);
+    const updatedConfirmers = Array.from(existingConfirmers);
+
+    const isMutualComplete =
+      peerHasAlreadyConfirmed ||
+      (existingConfirmers.has(targetGig.seeker_id) && existingConfirmers.has(targetGig.provider_id));
+
+    const newStatus = isMutualComplete ? ("COMPLETED" as const) : ("COMPLETION_PENDING" as const);
+    const completedAt = isMutualComplete ? new Date().toISOString() : undefined;
 
     setGigs((prev) => {
-      const updated = prev.map((g) => (g.id === gigId ? { ...g, status: "COMPLETED" as const, completed_at: completedAt } : g));
-      try { localStorage.setItem("hostelhire_saved_gigs", JSON.stringify(updated)); } catch {}
+      const updated = prev.map((g) =>
+        g.id === gigId
+          ? {
+              ...g,
+              status: newStatus,
+              completed_at: completedAt || g.completed_at,
+              confirmed_by_users: updatedConfirmers,
+            }
+          : g
+      );
+      try {
+        localStorage.setItem("hostelhire_saved_gigs", JSON.stringify(updated));
+      } catch {}
       return updated;
     });
 
     if (selectedGig && selectedGig.id === gigId) {
-      updateSelectedGig({ ...selectedGig, status: "COMPLETED", completed_at: completedAt });
+      updateSelectedGig({
+        ...selectedGig,
+        status: newStatus,
+        completed_at: completedAt || selectedGig.completed_at,
+        confirmed_by_users: updatedConfirmers,
+      });
     }
 
-    // Immediately remove completed listing or request from explore feed and database
-    if (targetGig && targetGig.source_id) {
+    // Immediately remove completed listing or request from explore feed and database if mutual completion reached
+    if (isMutualComplete && targetGig.source_id) {
       if (targetGig.source_type === "LISTING") {
         setListings((prev) => prev.filter((item) => item.id !== targetGig.source_id));
         deactivateServiceSource("LISTING", targetGig.source_id);
@@ -690,21 +768,20 @@ export default function Home() {
       }
     }
 
-    // Broadcast completion to all other devices in real-time
-    if (targetGig) {
-      try {
-        await recordServiceDecision(
-          gigId,
-          "COMPLETED",
-          user.id,
-          targetGig.seeker_id === user.id ? targetGig.provider_id : targetGig.seeker_id,
-          undefined,
-          targetGig.source_id,
-          targetGig.source_type
-        );
-      } catch (e) {
-        console.warn("Supabase record completion sync notice:", e);
-      }
+    // Broadcast confirmation decision to Supabase in real-time
+    try {
+      await recordServiceDecision(
+        gigId,
+        isMutualComplete ? "COMPLETED" : "CONFIRM_COMPLETION",
+        user.id,
+        peerId,
+        undefined,
+        targetGig.source_id,
+        targetGig.source_type,
+        user.id
+      );
+    } catch (e) {
+      console.warn("Supabase record completion sync notice:", e);
     }
   };
 

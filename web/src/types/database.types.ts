@@ -110,6 +110,7 @@ export interface Gig {
   status: GigLifecycleStatus;
   created_at: string;
   completed_at?: string | null;
+  confirmed_by_users?: string[];
   seeker?: Partial<Profile>;
   provider?: Partial<Profile>;
 }

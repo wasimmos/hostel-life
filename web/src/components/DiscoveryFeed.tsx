@@ -45,7 +45,11 @@ export function DiscoveryFeed({
     if (item.is_active === false) return false;
     if (completedSourceIds && completedSourceIds.has(item.id)) return false;
     // GH protected services should NOT be shown to boys
-    if (isUserBoy && item.girls_hostel_only) return false;
+    const isGhOnly = Boolean(
+      item.girls_hostel_only ||
+      item.description?.includes("[Girls Hostel Only]")
+    );
+    if (isUserBoy && isGhOnly) return false;
     return true;
   });
 
@@ -54,7 +58,11 @@ export function DiscoveryFeed({
     if (item.is_open === false) return false;
     if (completedSourceIds && completedSourceIds.has(item.id)) return false;
     // GH protected requests should NOT be shown to boys
-    if (isUserBoy && item.girls_hostel_only) return false;
+    const isGhOnly = Boolean(
+      item.girls_hostel_only ||
+      item.description?.includes("[Girls Hostel Only]")
+    );
+    if (isUserBoy && isGhOnly) return false;
     return true;
   });
 
@@ -193,7 +201,7 @@ export function DiscoveryFeed({
                           <span>{getProviderRating(listing.provider?.id).rating.toFixed(1)}</span>
                           <span className="text-[#92400E]/70 font-normal">({getProviderRating(listing.provider?.id).reviewCount})</span>
                         </div>
-                        {listing.girls_hostel_only ? (
+                        {listing.girls_hostel_only || listing.description?.includes("[Girls Hostel Only]") ? (
                           <span className="text-[9px] px-1.5 py-0.2 bg-[#F3E8FF] text-[#7E22CE] border border-[#E9D5FF] rounded font-bold">
                             GH Protected (Girls Only)
                           </span>
@@ -316,7 +324,7 @@ export function DiscoveryFeed({
                   <span className="text-[11px] text-[#64748B]">
                     {request.seeker?.hostel_block}
                   </span>
-                  {request.girls_hostel_only ? (
+                  {request.girls_hostel_only || request.description?.includes("[Girls Hostel Only]") ? (
                     <span className="text-[9px] px-1.5 py-0.2 bg-[#F3E8FF] text-[#7E22CE] border border-[#E9D5FF] rounded font-bold">
                       GH Protected (Girls Only)
                     </span>
@@ -334,7 +342,7 @@ export function DiscoveryFeed({
               {/* Body: Title & Need */}
               <div>
                 <div className="flex items-center gap-1.5 mb-1">
-                  {request.girls_hostel_only && (
+                  {(request.girls_hostel_only || request.description?.includes("[Girls Hostel Only]")) && (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FAF5FF] text-[#9333EA] border border-[#E9D5FF]">
                       👩‍🎓 Girls Hostel Only
                     </span>

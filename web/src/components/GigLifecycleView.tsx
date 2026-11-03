@@ -46,8 +46,18 @@ export function GigLifecycleView({
   const [copied, setCopied] = useState(false);
   const [femaleConsentApproved, setFemaleConsentApproved] = useState(false);
   const [manualContactShared, setManualContactShared] = useState(false);
-  const [hasConfirmed, setHasConfirmed] = useState(
-    gig.status === "COMPLETED" || gig.status === "COMPLETION_PENDING"
+  const [localConfirmed, setLocalConfirmed] = useState(false);
+
+  const isConfirmedByMe = Boolean(
+    gig.status === "COMPLETED" ||
+    (gig as any).confirmed_by_users?.includes(currentUser?.id) ||
+    localConfirmed
+  );
+
+  const isConfirmedByPeer = Boolean(
+    gig.status === "COMPLETION_PENDING" && !isConfirmedByMe
+  ) || Boolean(
+    (gig as any).confirmed_by_users?.some((id: string) => id !== currentUser?.id)
   );
 
   const isApproved =
@@ -282,7 +292,11 @@ export function GigLifecycleView({
         {gig.status === "COMPLETION_PENDING" && (
           <div className="mt-4 p-2.5 bg-[#FFFBEB] border border-[#FDE68A] rounded-lg flex items-center gap-2 text-xs text-[#D97706]">
             <Clock className="w-4 h-4 shrink-0" />
-            <span>One student has confirmed completion. Awaiting second confirmation.</span>
+            <span>
+              {isConfirmedByMe
+                ? "You confirmed completion. Awaiting peer's confirmation to finalize."
+                : `Peer (${otherParty?.full_name || "Student"}) has confirmed completion! Tap below to finalize.`}
+            </span>
           </div>
         )}
       </div>
@@ -486,17 +500,21 @@ export function GigLifecycleView({
         ) : (
           <button
             onClick={() => {
-              setHasConfirmed(true);
+              setLocalConfirmed(true);
               onConfirmCompletion(gig.id);
             }}
-            disabled={hasConfirmed}
+            disabled={isConfirmedByMe}
             className={`w-full py-2.5 text-xs font-bold rounded-lg transition-all ${
-              hasConfirmed
+              isConfirmedByMe
                 ? "bg-[#E2E8F0] text-[#64748B] cursor-not-allowed"
                 : "hh-btn-primary"
             }`}
           >
-            {hasConfirmed ? "✓ You Confirmed Completion (Pending Peer)" : "Mark Task as Completed"}
+            {isConfirmedByMe
+              ? "✓ You Confirmed Completion (Pending Peer)"
+              : isConfirmedByPeer
+              ? "Confirm & Complete Gig (Peer Waiting)"
+              : "Mark Task as Completed"}
           </button>
         )}
       </div>

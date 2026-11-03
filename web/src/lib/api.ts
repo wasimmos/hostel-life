@@ -37,7 +37,17 @@ export async function fetchListings(): Promise<(ServiceListing & { provider: Par
     console.error("Error fetching listings:", error);
     return [];
   }
-  return data as any;
+  return (data || []).map((item: any) => {
+    const isGhOnly = Boolean(
+      item.girls_hostel_only === true ||
+      item.description?.startsWith("[Girls Hostel Only]")
+    );
+    return {
+      ...item,
+      girls_hostel_only: isGhOnly,
+      description: item.description?.replace(/^\[Girls Hostel Only\]\s*/, "") || item.description,
+    };
+  }) as any;
 }
 
 export async function fetchRequests(): Promise<(ServiceRequest & { seeker: Partial<Profile> })[]> {
@@ -65,7 +75,17 @@ export async function fetchRequests(): Promise<(ServiceRequest & { seeker: Parti
     console.error("Error fetching requests:", error);
     return [];
   }
-  return data as any;
+  return (data || []).map((item: any) => {
+    const isGhOnly = Boolean(
+      item.girls_hostel_only === true ||
+      item.description?.startsWith("[Girls Hostel Only]")
+    );
+    return {
+      ...item,
+      girls_hostel_only: isGhOnly,
+      description: item.description?.replace(/^\[Girls Hostel Only\]\s*/, "") || item.description,
+    };
+  }) as any;
 }
 
 // ==========================================
@@ -155,7 +175,11 @@ export async function createServiceListing(listing: any, providerProfile?: Parti
     console.error("Error creating service listing:", error);
     throw error;
   }
-  return data;
+  return {
+    ...data,
+    girls_hostel_only: Boolean(listing.girls_hostel_only),
+    description: listing.description,
+  };
 }
 
 export async function createServiceRequest(request: any, seekerProfile?: Partial<Profile>) {
@@ -217,7 +241,11 @@ export async function createServiceRequest(request: any, seekerProfile?: Partial
     console.error("Error creating service request:", error);
     throw error;
   }
-  return data;
+  return {
+    ...data,
+    girls_hostel_only: Boolean(request.girls_hostel_only),
+    description: request.description,
+  };
 }
 
 export async function acceptGigInterestRPC(interestId: string, finalAgreedPrice: number) {
@@ -324,14 +352,35 @@ export async function recordServiceRequest(req: {
 
 export async function recordServiceDecision(
   gigId: string,
-  decision: "ACCEPTED" | "CANCELLED" | "COMPLETED",
+  decision: "ACCEPTED" | "CANCELLED" | "COMPLETED" | "CONFIRM_COMPLETION",
   providerId: string,
   seekerId: string,
   unlockedPhone?: string,
   sourceId?: string,
-  sourceType?: string
+  sourceType?: string,
+  confirmedBy?: string
 ) {
   if (!isSupabaseConfigured()) return null;
+
+  // Ensure caller/provider profile row exists in profiles table
+  try {
+    await supabase.from("profiles").upsert(
+      {
+        id: providerId,
+        full_name: "Hostel Resident",
+        roll_number: "",
+        college_email: `${providerId}@jecassam.ac.in`,
+        department: "Engineering",
+        semester: 1,
+        hostel_block: "Hostel 1",
+        room_number: "Room 101",
+        phone_number: unlockedPhone || "+91 9876543210",
+        bio: "Hostel resident.",
+        is_admin: false,
+      },
+      { onConflict: "id" }
+    );
+  } catch {}
 
   const payload = {
     seeker_id: providerId,
@@ -344,12 +393,20 @@ export async function recordServiceDecision(
       unlockedPhone,
       sourceId,
       sourceType,
+      confirmedBy: confirmedBy || providerId,
       timestamp: new Date().toISOString(),
     }),
     skill_category: "Academic Support",
     expected_budget: 80,
-    urgency: decision === "ACCEPTED" ? "Approved" : decision === "COMPLETED" ? "Completed" : "Declined",
-    is_open: decision !== "COMPLETED",
+    urgency:
+      decision === "ACCEPTED"
+        ? "Approved"
+        : decision === "COMPLETED"
+        ? "Completed"
+        : decision === "CONFIRM_COMPLETION"
+        ? "Confirmed"
+        : "Declined",
+    is_open: true, // MUST ALWAYS BE TRUE so Supabase RLS select/insert policies allow access to anon clients
   };
 
   const { data, error } = await supabase

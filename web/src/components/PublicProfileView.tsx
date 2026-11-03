@@ -40,7 +40,10 @@ export function PublicProfileView({
 
   // Active micro-gigs offered by this provider (exclude GH-only protected services from boys)
   const providerServices = listings.filter(
-    (l) => l.provider_id === provider.id && l.is_active !== false && (!isUserBoy || !l.girls_hostel_only)
+    (l) =>
+      l.provider_id === provider.id &&
+      l.is_active !== false &&
+      (!isUserBoy || (!l.girls_hostel_only && !l.description?.includes("[Girls Hostel Only]")))
   );
 
   return (
