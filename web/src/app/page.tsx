@@ -370,20 +370,42 @@ export default function Home() {
       // Live cross-device synchronization of requests and approvals
       const { requests: syncdRequests, decisions: syncdDecisions } = await fetchServiceModerations();
 
-      // 1. If any decisions (approvals/rejections) are recorded in Supabase, update matching gigs
+      // 1. If any decisions (approvals/rejections/completions) are recorded in Supabase, update matching gigs
       if (syncdDecisions.length > 0) {
+        // Auto-remove any completed listings or requests across all devices
+        const newlyCompletedSources = new Set<string>();
+        for (const dec of syncdDecisions) {
+          if (dec.decision === "COMPLETED" && dec.sourceId) {
+            newlyCompletedSources.add(dec.sourceId);
+          }
+        }
+        if (newlyCompletedSources.size > 0) {
+          setListings((prev) => prev.filter((l) => !newlyCompletedSources.has(l.id)));
+          setRequests((prev) => prev.filter((r) => !newlyCompletedSources.has(r.id)));
+        }
+
         setGigs((prevGigs) => {
           let hasChange = false;
           const updated = prevGigs.map((g) => {
             const dec = syncdDecisions.find((d) => d.gigId === g.id);
-            if (dec && g.status !== dec.decision) {
+            if (dec && (g.status !== dec.decision || (dec.decision === "COMPLETED" && !g.completed_at))) {
               hasChange = true;
+              // Check if current user is the requester or the provider
+              const isDirectParticipant = user && (user.id === g.seeker_id || user.id === g.provider_id);
+              const isProviderFemale = isFemaleHostel(g.provider?.hostel_block);
+              const isUserMale = !isFemaleHostel(user?.hostel_block);
+              // Crucial: Only attach unlocked phone number if the current user is the verified requester or provider!
+              const canReceivePhone = isDirectParticipant && (!isProviderFemale || !isUserMale || user.id === g.seeker_id);
+
               return {
                 ...g,
                 status: dec.decision as any,
+                completed_at: dec.decision === "COMPLETED" ? (dec.timestamp || new Date().toISOString()) : g.completed_at,
                 provider: {
                   ...g.provider,
-                  phone_number: dec.unlockedPhone || g.provider?.phone_number || "+91 9876543211",
+                  phone_number: (canReceivePhone && dec.unlockedPhone)
+                    ? dec.unlockedPhone
+                    : g.provider?.phone_number,
                 },
               };
             }
@@ -400,13 +422,21 @@ export default function Home() {
         setSelectedGig((prev) => {
           if (!prev) return null;
           const dec = syncdDecisions.find((d) => d.gigId === prev.id);
-          if (dec && prev.status !== dec.decision) {
+          if (dec && (prev.status !== dec.decision || (dec.decision === "COMPLETED" && !prev.completed_at))) {
+            const isDirectParticipant = user && (user.id === prev.seeker_id || user.id === prev.provider_id);
+            const isProviderFemale = isFemaleHostel(prev.provider?.hostel_block);
+            const isUserMale = !isFemaleHostel(user?.hostel_block);
+            const canReceivePhone = isDirectParticipant && (!isProviderFemale || !isUserMale || user.id === prev.seeker_id);
+
             const updated = {
               ...prev,
               status: dec.decision as any,
+              completed_at: dec.decision === "COMPLETED" ? (dec.timestamp || new Date().toISOString()) : prev.completed_at,
               provider: {
                 ...prev.provider,
-                phone_number: dec.unlockedPhone || prev.provider?.phone_number || "+91 9876543211",
+                phone_number: (canReceivePhone && dec.unlockedPhone)
+                  ? dec.unlockedPhone
+                  : prev.provider?.phone_number,
               },
             };
             try {
@@ -659,6 +689,23 @@ export default function Home() {
         deactivateServiceSource("REQUEST", targetGig.source_id);
       }
     }
+
+    // Broadcast completion to all other devices in real-time
+    if (targetGig) {
+      try {
+        await recordServiceDecision(
+          gigId,
+          "COMPLETED",
+          user.id,
+          targetGig.seeker_id === user.id ? targetGig.provider_id : targetGig.seeker_id,
+          undefined,
+          targetGig.source_id,
+          targetGig.source_type
+        );
+      } catch (e) {
+        console.warn("Supabase record completion sync notice:", e);
+      }
+    }
   };
 
   const handleSendServiceRequest = async (gigId: string, note?: string) => {
@@ -721,7 +768,7 @@ export default function Home() {
       updateSelectedGig({ ...selectedGig, status: "ACCEPTED" });
     }
 
-    // Write approval decision to Supabase so the boy's mobile receives it and unlocks contact info
+    // Write approval decision to Supabase so ONLY the verified requester unlocks contact info
     const targetGig = gigs.find((g) => g.id === gigId) || selectedGig;
     try {
       await recordServiceDecision(
@@ -729,7 +776,9 @@ export default function Home() {
         "ACCEPTED",
         user.id,
         targetGig?.seeker_id || "",
-        user.phone_number || "+91 9876543211"
+        user.phone_number || "+91 9876543211",
+        targetGig?.source_id,
+        targetGig?.source_type
       );
       await loadData();
     } catch (e) {
@@ -894,7 +943,10 @@ export default function Home() {
             onSelectProvider={(p) => updateSelectedProvider(p)}
           />
         ) : activeTab === "activity" ? (
-          <MyGigsList gigs={gigs} onSelectGig={(g) => updateSelectedGig(g)} />
+          <MyGigsList
+            gigs={gigs.filter((g) => g.seeker_id === user.id || g.provider_id === user.id)}
+            onSelectGig={(g) => updateSelectedGig(g)}
+          />
         ) : activeTab === "earnings" ? (
           <EarningsView currentUser={user} gigs={gigs} />
         ) : (

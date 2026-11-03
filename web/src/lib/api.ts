@@ -324,10 +324,12 @@ export async function recordServiceRequest(req: {
 
 export async function recordServiceDecision(
   gigId: string,
-  decision: "ACCEPTED" | "CANCELLED",
+  decision: "ACCEPTED" | "CANCELLED" | "COMPLETED",
   providerId: string,
   seekerId: string,
-  unlockedPhone?: string
+  unlockedPhone?: string,
+  sourceId?: string,
+  sourceType?: string
 ) {
   if (!isSupabaseConfigured()) return null;
 
@@ -340,12 +342,14 @@ export async function recordServiceDecision(
       providerId,
       seekerId,
       unlockedPhone,
+      sourceId,
+      sourceType,
       timestamp: new Date().toISOString(),
     }),
     skill_category: "Academic Support",
     expected_budget: 80,
-    urgency: decision === "ACCEPTED" ? "Approved" : "Declined",
-    is_open: true,
+    urgency: decision === "ACCEPTED" ? "Approved" : decision === "COMPLETED" ? "Completed" : "Declined",
+    is_open: decision !== "COMPLETED",
   };
 
   const { data, error } = await supabase

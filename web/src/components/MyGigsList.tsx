@@ -12,8 +12,9 @@ interface MyGigsListProps {
 export function MyGigsList({ gigs, onSelectGig }: MyGigsListProps) {
   const [filter, setFilter] = useState<"active" | "completed">("active");
 
+  // Completed gigs are automatically removed from the active list
   const activeGigs = gigs.filter(
-    (g) => g.status === "ACCEPTED" || g.status === "IN_PROGRESS" || g.status === "COMPLETION_PENDING"
+    (g) => g.status !== "COMPLETED" && g.status !== "CANCELLED"
   );
   const completedGigs = gigs.filter((g) => g.status === "COMPLETED");
 

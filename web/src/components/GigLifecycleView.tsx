@@ -55,12 +55,28 @@ export function GigLifecycleView({
     gig.status === "COMPLETED" ||
     femaleConsentApproved;
 
-  const isCrossGenderLocked =
-    isFemaleHostel(gig.provider?.hostel_block) &&
-    !isFemaleHostel(currentUser?.hostel_block) &&
-    !isApproved;
+  const isDirectParticipant = Boolean(
+    currentUser && (currentUser.id === gig.seeker_id || currentUser.id === gig.provider_id)
+  );
+  const isSpecificRequester = currentUser?.id === gig.seeker_id;
+  const isProvider = currentUser?.id === gig.provider_id;
 
-  const contactShared = !isCrossGenderLocked || manualContactShared;
+  const otherParty = currentUserRole === "seeker" ? gig.provider : gig.seeker;
+  const isOtherPartyFemale = isFemaleHostel(otherParty?.hostel_block);
+  const isViewerMale = !isFemaleHostel(currentUser?.hostel_block);
+
+  // Cross-Gender Privacy Rule:
+  // When a girl accepts a request, contact details MUST ONLY be revealed to the specific male/user who requested it.
+  // Other accounts or non-requesters must never see the unmasked phone number or active WhatsApp/Call buttons.
+  const canViewDirectContact = Boolean(
+    isDirectParticipant &&
+    (
+      (!isOtherPartyFemale || !isViewerMale) ||
+      (isSpecificRequester && isApproved)
+    )
+  );
+
+  const contactShared = canViewDirectContact || manualContactShared;
   const setContactShared = (shared: boolean) => setManualContactShared(shared);
 
   const steps = [
@@ -89,7 +105,6 @@ export function GigLifecycleView({
   };
 
   const currentStepIdx = getStepIndex(gig.status);
-  const otherParty = currentUserRole === "seeker" ? gig.provider : gig.seeker;
 
   return (
     <div className="flex flex-col gap-4 p-4 pb-12">
@@ -339,11 +354,11 @@ export function GigLifecycleView({
               </strong>
             </div>
 
-            {isApproved && isFemaleHostel(otherParty?.hostel_block) && !isFemaleHostel(currentUser?.hostel_block) && (
+            {canViewDirectContact && isOtherPartyFemale && isViewerMale && (
               <div className="p-2.5 bg-[#ECFDF5] border border-[#A7F3D0] rounded-lg flex items-center gap-2 text-xs text-[#059669]">
                 <CheckCircle2 className="w-4 h-4 shrink-0 text-[#059669]" />
                 <span className="font-semibold text-[11px]">
-                  Approval Granted by {otherParty?.full_name} • Phone & WhatsApp Unlocked. Handover at Campus Common Hub.
+                  Approval Granted by {otherParty?.full_name} to You • Phone & WhatsApp Unlocked. Handover at Campus Common Hub.
                 </span>
               </div>
             )}
@@ -352,15 +367,11 @@ export function GigLifecycleView({
               <span className="text-[#64748B]">Phone Number:</span>
               <div className="flex items-center gap-1.5">
                 <strong className="text-[#0F172A]">
-                  {isFemaleHostel(otherParty?.hostel_block) &&
-                  !isFemaleHostel(currentUser?.hostel_block) &&
-                  !isApproved
-                    ? maskPhoneNumber(otherParty?.phone_number)
-                    : otherParty?.phone_number || "+91 9876543211"}
+                  {canViewDirectContact
+                    ? otherParty?.phone_number || "+91 9876543211"
+                    : maskPhoneNumber(otherParty?.phone_number)}
                 </strong>
-                {(!isFemaleHostel(otherParty?.hostel_block) ||
-                  isFemaleHostel(currentUser?.hostel_block) ||
-                  isApproved) && (
+                {canViewDirectContact && (
                   <button
                     type="button"
                     onClick={() => {
@@ -401,12 +412,14 @@ export function GigLifecycleView({
 
             {/* External Coordination Handover Action */}
             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#E2E8F0]">
-              {isFemaleHostel(otherParty?.hostel_block) &&
-              !isFemaleHostel(currentUser?.hostel_block) &&
-              !isApproved ? (
-                <div className="col-span-2 py-2 px-3 bg-[#F1F5F9] border border-[#CBD5E1] rounded-lg text-center text-xs text-[#64748B] font-medium flex items-center justify-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-[#94A3B8]" />
-                  <span>Awaiting Female Student Approval to Reveal Contact</span>
+              {!canViewDirectContact ? (
+                <div className="col-span-2 py-2 px-3 bg-[#FAF5FF] border border-[#E9D5FF] rounded-lg text-center text-xs text-[#7E22CE] font-medium flex items-center justify-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-[#9333EA]" />
+                  <span>
+                    {isOtherPartyFemale && isViewerMale && !isSpecificRequester
+                      ? "Contact details locked to verified requester only"
+                      : `Awaiting ${otherParty?.full_name || "Female Student"} approval to reveal contact`}
+                  </span>
                 </div>
               ) : (
                 <>
