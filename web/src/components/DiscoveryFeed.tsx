@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, ShieldCheck, Clock, Zap, ArrowRight, MessageSquarePlus, MessageCircle, Lock, RotateCw, Star } from "lucide-react";
+import { Search, ShieldCheck, Clock, Zap, ArrowRight, MessageSquarePlus, MessageCircle, Lock, RotateCw, Star, HeartHandshake } from "lucide-react";
 import { ServiceListing, ServiceRequest, Profile } from "@/types/database.types";
 import { getWhatsAppUrl, isFemaleHostel, canAccessDirectContact, maskPhoneNumber, getProviderRating } from "@/lib/contact";
 
@@ -38,17 +38,23 @@ export function DiscoveryFeed({
     "Hostel Essentials",
   ];
 
-  // Active listings (exclude inactive or completed ones)
+  const isUserBoy = !isFemaleHostel(currentUser?.hostel_block);
+
+  // Active listings (exclude inactive, completed, or GH-only protected services from boys)
   const activeListings = listings.filter((item) => {
     if (item.is_active === false) return false;
     if (completedSourceIds && completedSourceIds.has(item.id)) return false;
+    // GH protected services should NOT be shown to boys
+    if (isUserBoy && item.girls_hostel_only) return false;
     return true;
   });
 
-  // Active requests (exclude closed or completed ones)
+  // Active requests (exclude closed, completed, or GH-only protected requests from boys)
   const activeRequests = requests.filter((item) => {
     if (item.is_open === false) return false;
     if (completedSourceIds && completedSourceIds.has(item.id)) return false;
+    // GH protected requests should NOT be shown to boys
+    if (isUserBoy && item.girls_hostel_only) return false;
     return true;
   });
 
@@ -187,11 +193,15 @@ export function DiscoveryFeed({
                           <span>{getProviderRating(listing.provider?.id).rating.toFixed(1)}</span>
                           <span className="text-[#92400E]/70 font-normal">({getProviderRating(listing.provider?.id).reviewCount})</span>
                         </div>
-                        {isFemaleHostel(listing.provider?.hostel_block) && (
+                        {listing.girls_hostel_only ? (
                           <span className="text-[9px] px-1.5 py-0.2 bg-[#F3E8FF] text-[#7E22CE] border border-[#E9D5FF] rounded font-bold">
-                            GH Protected
+                            GH Protected (Girls Only)
                           </span>
-                        )}
+                        ) : isFemaleHostel(listing.provider?.hostel_block) ? (
+                          <span className="text-[9px] px-1.5 py-0.2 bg-[#EFF6FF] text-[#1E40AF] border border-[#DBEAFE] rounded font-bold">
+                            Campus Hub Handover
+                          </span>
+                        ) : null}
                       </div>
                       <div className="flex items-center gap-1.5 text-[11px] text-[#64748B]">
                         <span>{listing.provider?.hostel_block}</span>
@@ -209,13 +219,6 @@ export function DiscoveryFeed({
 
                 {/* Body: Title & Description */}
                 <div>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    {listing.girls_hostel_only && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FAF5FF] text-[#9333EA] border border-[#E9D5FF]">
-                        👩‍🎓 Girls Hostel Only
-                      </span>
-                    )}
-                  </div>
                   <h3 className="text-sm font-bold text-[#0F172A] leading-snug">
                     {listing.title}
                   </h3>
@@ -237,39 +240,55 @@ export function DiscoveryFeed({
                   </div>
 
                   <div className="flex items-center gap-1.5">
-                    {canAccessDirectContact(listing.provider?.hostel_block, currentUser?.hostel_block) ? (
-                      <a
-                        href={getWhatsAppUrl(
-                          listing.provider?.phone_number,
-                          `Hi ${listing.provider?.full_name || "peer"}, I saw your HostelHire listing "${listing.title}" (₹${listing.indicative_price}). Are you available to help?`
-                        )}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="p-1.5 rounded-lg border border-[#A7F3D0] bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5] transition-colors flex items-center justify-center"
-                        title="Direct WhatsApp Message"
-                      >
-                        <MessageCircle className="w-3.5 h-3.5" />
-                      </a>
-                    ) : (
-                      <span
-                        className="p-1.5 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-[#94A3B8] flex items-center justify-center"
-                        title="Privacy Shield: Contact protected. Apply to request consent."
-                      >
-                        <Lock className="w-3.5 h-3.5" />
-                      </span>
-                    )}
-
                     {isFemaleHostel(listing.provider?.hostel_block) && !isFemaleHostel(currentUser?.hostel_block) ? (
-                      <button className="py-1 px-2.5 text-xs font-bold rounded-lg bg-[#9333EA] hover:bg-[#7E22CE] text-white flex items-center gap-1 shadow-xs transition-colors">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectListing(listing);
+                        }}
+                        className="py-1 px-3 text-xs font-bold rounded-lg bg-[#9333EA] hover:bg-[#7E22CE] text-white flex items-center gap-1.5 shadow-xs transition-colors"
+                      >
+                        <HeartHandshake className="w-3.5 h-3.5" />
                         <span>Request Service</span>
                         <ArrowRight className="w-3 h-3" />
                       </button>
                     ) : (
-                      <button className="hh-btn-primary py-1 px-2.5 text-xs flex items-center gap-1">
-                        <span>Express Interest</span>
-                        <ArrowRight className="w-3 h-3" />
-                      </button>
+                      <>
+                        {canAccessDirectContact(listing.provider?.hostel_block, currentUser?.hostel_block) ? (
+                          <a
+                            href={getWhatsAppUrl(
+                              listing.provider?.phone_number,
+                              `Hi ${listing.provider?.full_name || "peer"}, I saw your HostelHire listing "${listing.title}" (₹${listing.indicative_price}). Are you available to help?`
+                            )}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-1.5 rounded-lg border border-[#A7F3D0] bg-[#ECFDF5] text-[#059669] hover:bg-[#D1FAE5] transition-colors flex items-center justify-center"
+                            title="Direct WhatsApp Message"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                          </a>
+                        ) : (
+                          <span
+                            className="p-1.5 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-[#94A3B8] flex items-center justify-center"
+                            title="Privacy Shield: Contact protected."
+                          >
+                            <Lock className="w-3.5 h-3.5" />
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectListing(listing);
+                          }}
+                          className="hh-btn-primary py-1 px-2.5 text-xs flex items-center gap-1"
+                        >
+                          <span>Express Interest</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -297,11 +316,15 @@ export function DiscoveryFeed({
                   <span className="text-[11px] text-[#64748B]">
                     {request.seeker?.hostel_block}
                   </span>
-                  {isFemaleHostel(request.seeker?.hostel_block) && (
+                  {request.girls_hostel_only ? (
                     <span className="text-[9px] px-1.5 py-0.2 bg-[#F3E8FF] text-[#7E22CE] border border-[#E9D5FF] rounded font-bold">
-                      GH Protected
+                      GH Protected (Girls Only)
                     </span>
-                  )}
+                  ) : isFemaleHostel(request.seeker?.hostel_block) ? (
+                    <span className="text-[9px] px-1.5 py-0.2 bg-[#EFF6FF] text-[#1E40AF] border border-[#DBEAFE] rounded font-bold">
+                      Campus Hub Handover
+                    </span>
+                  ) : null}
                 </div>
                 <span className="text-xs font-bold text-[#059669]">
                   Budget: ₹{request.expected_budget}

@@ -418,7 +418,7 @@ export function GigLifecycleView({
                   <span>
                     {isOtherPartyFemale && isViewerMale && !isSpecificRequester
                       ? "Contact details locked to verified requester only"
-                      : `Awaiting ${otherParty?.full_name || "Female Student"} approval to reveal contact`}
+                      : `Awaiting ${gig.provider?.full_name || "Female Student"} approval to reveal contact`}
                   </span>
                 </div>
               ) : (

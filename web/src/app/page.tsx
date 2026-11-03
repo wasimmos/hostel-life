@@ -835,7 +835,10 @@ export default function Home() {
   };
 
   const handleSelectListing = (listing: ServiceListing) => {
-    const existing = gigs.find((g) => g.source_id === listing.id);
+    // Only link to an existing gig if the CURRENT user is the seeker or provider of that gig!
+    const existing = gigs.find(
+      (g) => g.source_id === listing.id && (g.seeker_id === user.id || g.provider_id === user.id)
+    );
     if (existing) {
       updateSelectedGig(existing);
     } else {
@@ -863,21 +866,29 @@ export default function Home() {
   };
 
   const handleSelectRequest = (request: ServiceRequest) => {
-    const newGig: Gig & { seeker: any; provider: any } = {
-      id: `gig-${Date.now().toString().slice(-4)}`,
-      source_type: "REQUEST",
-      source_id: request.id,
-      seeker_id: request.seeker_id,
-      provider_id: user.id,
-      accepted_interest_id: `int-${Date.now()}`,
-      agreed_price: request.expected_budget,
-      status: "ACCEPTED",
-      created_at: new Date().toISOString(),
-      seeker: (request as any).seeker,
-      provider: user,
-    };
-    setGigs([newGig, ...gigs]);
-    updateSelectedGig(newGig);
+    // Only link to an existing gig if the CURRENT user is the seeker or provider of that gig!
+    const existing = gigs.find(
+      (g) => g.source_id === request.id && (g.seeker_id === user.id || g.provider_id === user.id)
+    );
+    if (existing) {
+      updateSelectedGig(existing);
+    } else {
+      const newGig: Gig & { seeker: any; provider: any } = {
+        id: `gig-${Date.now().toString().slice(-4)}`,
+        source_type: "REQUEST",
+        source_id: request.id,
+        seeker_id: request.seeker_id,
+        provider_id: user.id,
+        accepted_interest_id: `int-${Date.now()}`,
+        agreed_price: request.expected_budget,
+        status: "ACCEPTED",
+        created_at: new Date().toISOString(),
+        seeker: (request as any).seeker,
+        provider: user,
+      };
+      setGigs([newGig, ...gigs]);
+      updateSelectedGig(newGig);
+    }
   };
 
   if (!isAuthenticated) {

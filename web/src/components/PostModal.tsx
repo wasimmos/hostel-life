@@ -190,11 +190,11 @@ export function PostModal({
               />
               <label htmlFor="gh-only" className="cursor-pointer">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-[#6B21A8]">Girls Hostel (GH) Only</span>
+                  <span className="text-xs font-bold text-[#6B21A8]">GH Protected (Girls Hostel Only)</span>
                   <span className="text-[9px] px-1.5 py-0.2 bg-[#F3E8FF] text-[#7E22CE] rounded-full font-bold">Privacy Shield</span>
                 </div>
                 <p className="text-[11px] text-[#7E22CE]/80 leading-snug mt-0.5">
-                  Restrict this post and room visits exclusively to verified female hostel peers.
+                  Restrict this post strictly to female hostel peers. Male students will not see this listing. Leave unchecked if you are open to common-hub service requests from all campus students.
                 </p>
               </label>
             </div>

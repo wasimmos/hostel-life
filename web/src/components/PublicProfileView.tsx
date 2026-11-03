@@ -36,9 +36,11 @@ export function PublicProfileView({
   const isCrossGenderGH =
     isFemaleHostel(provider.hostel_block) && !isFemaleHostel(currentUser.hostel_block);
 
-  // Active micro-gigs offered by this provider
+  const isUserBoy = !isFemaleHostel(currentUser.hostel_block);
+
+  // Active micro-gigs offered by this provider (exclude GH-only protected services from boys)
   const providerServices = listings.filter(
-    (l) => l.provider_id === provider.id && l.is_active !== false
+    (l) => l.provider_id === provider.id && l.is_active !== false && (!isUserBoy || !l.girls_hostel_only)
   );
 
   return (
